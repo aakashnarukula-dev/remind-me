@@ -293,7 +293,8 @@ public final class CallService extends Service {
         }
         if (customCall()) {
             RemoteStore.ScriptAnswer selected = activeSchedule.questions.get(step).answers.get(option);
-            String response = SpeechText.custom(selected.response, member, label, language);
+            String response = SpeechText.custom(selected.response, member, label,
+                    activeSchedule.category, language);
             int nextStep = step + 1;
             if (nextStep >= activeSchedule.questions.size()) {
                 scheduleConfirmationAfterPrimary();
@@ -845,7 +846,7 @@ public final class CallService extends Service {
         }
         if (customCall()) {
             return SpeechText.custom(activeSchedule.questions.get(step).prompt,
-                    member, label, language);
+                    member, label, activeSchedule.category, language);
         }
         boolean meal = ReminderScheduler.PHASE_MEAL.equals(phase);
         if (step == 0) return meal ? SpeechText.mealQuestion(member, label,

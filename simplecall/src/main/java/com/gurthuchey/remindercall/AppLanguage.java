@@ -170,7 +170,8 @@ final class AppLanguage {
     static String detect(String text, String fallback) {
         int[] counts = new int[6];
         String source = text == null ? "" : text.replace("[Name]", "")
-                .replace("[Reminder title]", "").replace("[Reminder]", "");
+                .replace("[Reminder title]", "").replace("[Reminder]", "")
+                .replace("[category]", "").replace("[Category]", "");
         if (!source.isEmpty()) {
             for (int offset = 0; offset < source.length();) {
                 int value = source.codePointAt(offset);

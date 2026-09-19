@@ -22,7 +22,8 @@ function detectLanguage(text, fallback = "te") {
   const counts = {en: 0, te: 0, hi: 0, ta: 0, kn: 0, ml: 0};
   const source = typeof text === "string"
     ? text.replaceAll("[Name]", "").replaceAll("[Reminder title]", "")
-      .replaceAll("[Reminder]", "") : "";
+      .replaceAll("[Reminder]", "").replaceAll("[category]", "")
+      .replaceAll("[Category]", "") : "";
   for (const character of source) {
     const value = character.codePointAt(0);
     if (value >= 0x0c00 && value <= 0x0c7f) counts.te += 1;
@@ -56,12 +57,41 @@ function medicineName(value, lang = "te") {
   return result || fallbacks[language(lang)];
 }
 
-function customText(template, memberName, reminderLabel, lang = "te") {
+function categoryName(value, lang = "te") {
+  const key = typeof value === "string" ? value.trim().toLowerCase() : "custom";
+  const names = {
+    en: {medicine: "medicine", supplement: "supplement", meal: "meal", drink: "drink",
+      exercise: "exercise", appointment: "appointment", payment: "bill or payment",
+      task: "task", wake_up: "wake-up reminder", custom: "reminder"},
+    te: {medicine: "మందు", supplement: "సప్లిమెంట్", meal: "భోజనం", drink: "పానీయం",
+      exercise: "వ్యాయామం", appointment: "అపాయింట్‌మెంట్", payment: "బిల్లు లేదా చెల్లింపు",
+      task: "పని", wake_up: "నిద్రలేవడం", custom: "రిమైండర్"},
+    hi: {medicine: "दवा", supplement: "सप्लीमेंट", meal: "भोजन", drink: "पेय",
+      exercise: "व्यायाम", appointment: "अपॉइंटमेंट", payment: "बिल या भुगतान",
+      task: "काम", wake_up: "जागने का रिमाइंडर", custom: "रिमाइंडर"},
+    ta: {medicine: "மருந்து", supplement: "ஊட்டச்சத்து மாத்திரை", meal: "உணவு", drink: "பானம்",
+      exercise: "உடற்பயிற்சி", appointment: "சந்திப்பு", payment: "பில் அல்லது கட்டணம்",
+      task: "பணி", wake_up: "எழுந்திருக்கும் நினைவூட்டல்", custom: "நினைவூட்டல்"},
+    kn: {medicine: "ಔಷಧಿ", supplement: "ಪೂರಕ ಮಾತ್ರೆ", meal: "ಊಟ", drink: "ಪಾನೀಯ",
+      exercise: "ವ್ಯಾಯಾಮ", appointment: "ಅಪಾಯಿಂಟ್‌ಮೆಂಟ್", payment: "ಬಿಲ್ ಅಥವಾ ಪಾವತಿ",
+      task: "ಕೆಲಸ", wake_up: "ಎಚ್ಚರಗೊಳ್ಳುವ ಜ್ಞಾಪನೆ", custom: "ಜ್ಞಾಪನೆ"},
+    ml: {medicine: "മരുന്ന്", supplement: "സപ്ലിമെന്റ്", meal: "ഭക്ഷണം", drink: "പാനീയം",
+      exercise: "വ്യായാമം", appointment: "അപ്പോയിന്റ്മെന്റ്", payment: "ബിൽ അല്ലെങ്കിൽ പേയ്മെന്റ്",
+      task: "ജോലി", wake_up: "ഉണരാനുള്ള ഓർമ്മപ്പെടുത്തൽ", custom: "ഓർമ്മപ്പെടുത്തൽ"},
+  };
+  const localized = names[language(lang)];
+  return localized[key] || localized.custom;
+}
+
+function customText(template, memberName, reminderLabel, lang = "te", category = "custom") {
   if (typeof template !== "string") return "";
+  const categoryValue = categoryName(category, lang);
   return clean(template, 300, "")
     .replace(/\[Name\]/g, addressName(memberName, lang))
     .replace(/\[Reminder title\]/gi, clean(reminderLabel, 80, medicineName("", lang)))
-    .replace(/\[Reminder\]/g, clean(reminderLabel, 80, medicineName("", lang)));
+    .replace(/\[Reminder\]/g, clean(reminderLabel, 80, medicineName("", lang)))
+    .replace(/\[category\]/g, categoryValue)
+    .replace(/\[Category\]/g, categoryValue.charAt(0).toUpperCase() + categoryValue.slice(1));
 }
 
 function duration(minutes, lang = "te") {
@@ -236,7 +266,8 @@ function voiceEntries(member) {
       : typeof schedule.kind === "string"
         ? schedule.kind.trim().toLowerCase() : "medicine";
     const category = rawCategory || "medicine";
-    if (category === "medicine") {
+    const questions = Array.isArray(schedule.questions) ? schedule.questions.slice(0, 10) : [];
+    if (category === "medicine" && questions.length === 0) {
       add(medicineQuestion(name, schedule.label, lang), lang);
       if (Number(schedule.preMinutes) > 0) {
         add(mealQuestion(name, schedule.label,
@@ -250,14 +281,17 @@ function voiceEntries(member) {
       add(reminderDelayed(30, lang), lang);
       add(reminderDelayed(60, lang), lang);
     } else {
-      const questions = Array.isArray(schedule.questions) ? schedule.questions.slice(0, 10) : [];
+      if (category === "medicine" && Number(schedule.preMinutes) > 0) {
+        add(mealQuestion(name, schedule.label,
+          Number(schedule.hour) < 12, Number(schedule.preMinutes), lang), lang);
+      }
       for (const question of questions) {
-        const prompt = customText(question && question.prompt, name, schedule.label, lang);
+        const prompt = customText(question && question.prompt, name, schedule.label, lang, category);
         add(prompt, lang);
         const answers = Array.isArray(question && question.answers)
           ? question.answers.slice(0, 4) : [];
         for (const answer of answers) {
-          const response = customText(answer && answer.response, name, schedule.label, lang);
+          const response = customText(answer && answer.response, name, schedule.label, lang, category);
           add(response, lang);
         }
       }
@@ -307,6 +341,7 @@ module.exports = {
   detectLanguage,
   addressName,
   medicineName,
+  categoryName,
   customText,
   mealQuestion,
   mealCompleted,

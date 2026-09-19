@@ -48,6 +48,15 @@ public final class SpeechTextTest {
                         "Aakash", "Collagen drink", "en"));
     }
 
+    @Test public void customCategoryPlaceholderTracksCurrentCategory() {
+        assertEquals("Hi Aakash. It's time for Collagen drink drink.",
+                SpeechText.custom("Hi [Name]. It's time for [Reminder title] [category].",
+                        "Aakash", "Collagen drink", "drink", "en"));
+        assertEquals("Supplement: Omega-3.",
+                SpeechText.custom("[Category]: [Reminder title].",
+                        "Aakash", "Omega-3", "supplement", "en"));
+    }
+
     @Test public void customReminderCollapsesUnicodeWhitespaceLikeCloudVoice() {
         assertEquals("హలో అమ్మా! డాక్టర్ అపాయింట్మెంట్ గుర్తుందా?",
                 SpeechText.custom("హలో\u00a0[Name]!\u2007[Reminder]\ufeffగుర్తుందా?",

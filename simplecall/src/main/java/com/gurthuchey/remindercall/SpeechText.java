@@ -8,11 +8,20 @@ final class SpeechText {
     }
 
     static String custom(String template, String member, String reminder, String language) {
+        return custom(template, member, reminder, "custom", language);
+    }
+
+    static String custom(String template, String member, String reminder, String category,
+            String language) {
         if (template == null) return "";
         String reminderTitle = clean(reminder, reminderFallback(language));
+        String categoryTitle = AppLanguage.category(language, category);
+        String categoryName = categoryTitle.toLowerCase(java.util.Locale.ROOT);
         return clean(template, "").replace("[Name]", clean(member, addressFallback(language)))
                 .replace("[Reminder title]", reminderTitle)
-                .replace("[Reminder]", reminderTitle);
+                .replace("[Reminder]", reminderTitle)
+                .replace("[category]", categoryName)
+                .replace("[Category]", categoryTitle);
     }
 
     static String medicineQuestion(String member, String medicine) {
