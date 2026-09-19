@@ -1,0 +1,105 @@
+{
+  "project_info": {
+    "project_number": "520079547367",
+    "project_id": "gurthu-chey",
+    "storage_bucket": "gurthu-chey.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:520079547367:android:1d8231ec846ecc0815fb42",
+        "android_client_info": {
+          "package_name": "com.gurthuchey.admin"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "520079547367-qnin0ta75oel0q1rd4mko71bqv9rkf4h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.gurthuchey.admin",
+            "certificate_hash": "3ba634be04acca49cd68ec26872dc8fbc85d2bd9"
+          }
+        },
+        {
+          "client_id": "520079547367-n1929uq3sbvo91j9s0rjl67p41hgbnar.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoUXiapXQJz-e7uKjNd96sVioYHpE7QrI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "520079547367-n1929uq3sbvo91j9s0rjl67p41hgbnar.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:520079547367:android:0319a827639284cc15fb42",
+        "android_client_info": {
+          "package_name": "com.gurthuchey.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "520079547367-n1929uq3sbvo91j9s0rjl67p41hgbnar.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoUXiapXQJz-e7uKjNd96sVioYHpE7QrI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "520079547367-n1929uq3sbvo91j9s0rjl67p41hgbnar.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:520079547367:android:17324692afb9af0b15fb42",
+        "android_client_info": {
+          "package_name": "com.gurthuchey.remindercall"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "520079547367-n1929uq3sbvo91j9s0rjl67p41hgbnar.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAoUXiapXQJz-e7uKjNd96sVioYHpE7QrI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "520079547367-n1929uq3sbvo91j9s0rjl67p41hgbnar.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

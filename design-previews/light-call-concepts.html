@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reminder Call — Light UI directions</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Noto Sans Telugu", "Noto Sans", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #e8edf0;
+      color: #173149;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-width: 1280px;
+      background:
+        radial-gradient(circle at 12% 8%, rgba(255,255,255,.9), transparent 30%),
+        #e8edf0;
+    }
+
+    .board {
+      width: 1440px;
+      margin: 0 auto;
+      padding: 48px 48px 64px;
+    }
+
+    .board-header {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      padding: 0 4px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 34px;
+      font-weight: 720;
+      letter-spacing: -.03em;
+      color: #112b3e;
+    }
+
+    .board-header p {
+      width: 490px;
+      margin: 0;
+      color: #5c6d78;
+      font-size: 16px;
+      line-height: 1.45;
+      text-align: right;
+    }
+
+    .concepts {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 24px;
+      align-items: start;
+    }
+
+    .concept-label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      min-height: 50px;
+      padding: 0 4px;
+    }
+
+    .concept-label h2 {
+      margin: 0;
+      color: #173149;
+      font-size: 19px;
+      letter-spacing: -.015em;
+    }
+
+    .concept-label span {
+      color: #71818c;
+      font-size: 13px;
+    }
+
+    .phone {
+      position: relative;
+      width: 318px;
+      height: 688px;
+      overflow: hidden;
+      border: 7px solid #18242b;
+      border-radius: 42px;
+      box-shadow: 0 24px 55px rgba(31, 47, 56, .20), 0 4px 12px rgba(31, 47, 56, .12);
+      isolation: isolate;
+    }
+
+    .phone::after {
+      position: absolute;
+      content: "";
+      top: 9px;
+      left: 50%;
+      width: 72px;
+      height: 19px;
+      border-radius: 20px;
+      background: #18242b;
+      transform: translateX(-50%);
+      z-index: 20;
+    }
+
+    .statusbar {
+      position: relative;
+      z-index: 10;
+      height: 38px;
+      padding: 12px 18px 0;
+      display: flex;
+      justify-content: space-between;
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .status-icons { letter-spacing: 1px; }
+
+    .question {
+      color: var(--ink);
+      font-size: 25px;
+      font-weight: 750;
+      line-height: 1.42;
+      letter-spacing: -.025em;
+    }
+
+    .actions {
+      display: grid;
+      gap: 12px;
+    }
+
+    button {
+      min-height: 64px;
+      border: 0;
+      border-radius: 22px;
+      color: white;
+      font: inherit;
+      font-size: 19px;
+      font-weight: 760;
+      box-shadow: 0 9px 20px rgba(28, 50, 60, .12);
+    }
+
+    .yes { background: var(--yes); }
+    .no { background: var(--no); }
+
+    .medicine-mark {
+      display: grid;
+      place-items: center;
+      color: var(--ink);
+      background: var(--mark);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.65), 0 10px 30px rgba(31,71,88,.10);
+    }
+
+    .capsule {
+      position: relative;
+      width: 44px;
+      height: 22px;
+      border-radius: 22px;
+      background: #fff;
+      border: 3px solid currentColor;
+      transform: rotate(-38deg);
+      overflow: hidden;
+    }
+
+    .capsule::after {
+      position: absolute;
+      content: "";
+      width: 50%;
+      height: 100%;
+      right: 0;
+      background: #f4b942;
+      border-left: 3px solid currentColor;
+    }
+
+    /* 1 — Porcelain */
+    .porcelain {
+      --ink: #15354a;
+      --yes: #12845e;
+      --no: #e75b4e;
+      --mark: rgba(217, 238, 241, .92);
+      background:
+        radial-gradient(circle at 85% 18%, rgba(186,222,229,.8), transparent 26%),
+        linear-gradient(160deg, #fbfdfd 0%, #edf6f7 100%);
+    }
+
+    .porcelain .content {
+      height: calc(100% - 38px);
+      padding: 28px 24px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .porcelain .identity { text-align: center; }
+    .porcelain .identity strong { display: block; font-size: 19px; color: var(--ink); }
+    .porcelain .identity span { display: block; margin-top: 4px; color: #68808d; font-size: 14px; }
+    .porcelain .medicine-mark { width: 110px; height: 110px; margin: 50px 0 28px; border-radius: 50%; }
+    .porcelain .question {
+      width: 100%;
+      padding: 25px 20px;
+      border: 1px solid rgba(92, 142, 157, .20);
+      border-radius: 28px;
+      background: rgba(255,255,255,.58);
+      backdrop-filter: blur(18px);
+      text-align: center;
+      box-shadow: 0 18px 45px rgba(37,82,97,.08);
+    }
+    .porcelain .actions { width: 100%; margin-top: auto; }
+
+    /* 2 — Clinical paper */
+    .clinical {
+      --ink: #18324a;
+      --yes: #167a68;
+      --no: #d9554b;
+      --mark: #f5c34f;
+      background: #fffdf7;
+    }
+
+    .clinical .side-rule {
+      position: absolute;
+      left: 0;
+      top: 38px;
+      bottom: 0;
+      width: 9px;
+      background: #f5c34f;
+    }
+
+    .clinical .content {
+      height: calc(100% - 38px);
+      padding: 35px 24px 24px 35px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .clinical .topline { display: flex; align-items: center; gap: 13px; }
+    .clinical .medicine-mark { width: 54px; height: 54px; border-radius: 17px; }
+    .clinical .medicine-mark .capsule { width: 30px; height: 15px; border-width: 2px; }
+    .clinical .identity strong { display: block; color: var(--ink); font-size: 19px; }
+    .clinical .identity span { color: #6b7b84; font-size: 14px; }
+    .clinical .question {
+      margin-top: 85px;
+      padding-bottom: 26px;
+      border-bottom: 2px solid #d8e4df;
+      font-size: 27px;
+      text-align: left;
+    }
+    .clinical .helper { margin-top: 18px; color: #657983; font-size: 14px; line-height: 1.45; }
+    .clinical .actions { margin-top: auto; }
+    .clinical button { border-radius: 12px; box-shadow: none; }
+
+    /* 3 — Morning sky */
+    .sky {
+      --ink: #12344c;
+      --yes: #16875f;
+      --no: #e55e50;
+      --mark: rgba(255,255,255,.75);
+      background:
+        radial-gradient(circle at 20% 18%, rgba(255,255,255,.95), transparent 25%),
+        radial-gradient(circle at 84% 68%, rgba(182,221,235,.65), transparent 35%),
+        #eaf5fa;
+    }
+
+    .sky .content {
+      height: calc(100% - 38px);
+      padding: 30px 23px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sky .identity { display: flex; justify-content: space-between; align-items: center; }
+    .sky .identity strong { font-size: 19px; color: var(--ink); }
+    .sky .live { padding: 7px 10px; border-radius: 14px; color: #347184; background: rgba(255,255,255,.56); font-size: 12px; font-weight: 700; }
+    .sky .medicine-mark {
+      width: 128px;
+      height: 128px;
+      margin: 64px auto 0;
+      border-radius: 44% 56% 53% 47% / 45% 45% 55% 55%;
+      backdrop-filter: blur(18px);
+    }
+    .sky .question {
+      margin: 34px 0 0;
+      text-align: center;
+    }
+    .sky .actions { margin-top: auto; grid-template-columns: 1fr 1fr; }
+    .sky button { min-height: 88px; padding: 8px; border-radius: 26px; font-size: 17px; line-height: 1.25; }
+
+    /* 4 — Quiet garden */
+    .garden {
+      --ink: #17372f;
+      --yes: #187d59;
+      --no: #d95b50;
+      --mark: rgba(252, 255, 249, .72);
+      background:
+        radial-gradient(ellipse at 15% 25%, rgba(255,255,255,.9), transparent 18%),
+        radial-gradient(ellipse at 78% 33%, rgba(150,187,142,.38), transparent 25%),
+        radial-gradient(ellipse at 45% 70%, rgba(92,136,103,.32), transparent 28%),
+        #e8f0e5;
+    }
+
+    .garden .leaf {
+      position: absolute;
+      width: 210px;
+      height: 90px;
+      border-radius: 90% 10% 90% 10%;
+      background: rgba(80,125,93,.18);
+      filter: blur(3px);
+      transform: rotate(-22deg);
+    }
+    .garden .leaf.one { left: -70px; top: 230px; }
+    .garden .leaf.two { right: -90px; top: 355px; transform: rotate(28deg); }
+    .garden .compact-id {
+      position: relative;
+      z-index: 2;
+      width: max-content;
+      margin: 20px auto 0;
+      padding: 11px 17px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid rgba(255,255,255,.75);
+      border-radius: 18px;
+      color: var(--ink);
+      background: rgba(255,255,255,.44);
+      backdrop-filter: blur(15px);
+      box-shadow: 0 9px 25px rgba(45,83,56,.08);
+      font-size: 14px;
+    }
+    .garden .compact-id b { font-size: 16px; }
+    .garden .dot { width: 8px; height: 8px; border-radius: 50%; background: #35a071; }
+    .garden .sheet {
+      position: absolute;
+      z-index: 3;
+      left: 14px;
+      right: 14px;
+      bottom: 14px;
+      padding: 26px 20px 20px;
+      border: 1px solid rgba(255,255,255,.92);
+      border-radius: 34px;
+      background: rgba(249,252,245,.74);
+      backdrop-filter: blur(22px);
+      box-shadow: 0 20px 50px rgba(39,73,48,.16);
+    }
+    .garden .question { margin-bottom: 24px; font-size: 24px; text-align: left; }
+    .garden button { min-height: 62px; border-radius: 19px; }
+
+    .recommended {
+      position: absolute;
+      z-index: 15;
+      top: 49px;
+      right: 14px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      color: #fff;
+      background: #173149;
+      font-size: 10px;
+      font-weight: 750;
+    }
+  </style>
+</head>
+<body>
+  <main class="board">
+    <header class="board-header">
+      <h1>Reminder Call — light directions</h1>
+      <p>Four implementation-ready compositions using the same question and actions. Each keeps a generous safe area and elderly-friendly touch targets.</p>
+    </header>
+
+    <section class="concepts">
+      <article class="concept">
+        <div class="concept-label"><h2>1. Porcelain</h2><span>Balanced</span></div>
+        <div class="phone porcelain">
+          <div class="recommended">RECOMMENDED</div>
+          <div class="statusbar"><span>4:37</span><span class="status-icons">◔ 5G ▮▮ 71</span></div>
+          <div class="content">
+            <div class="identity"><strong>Aakash</strong><span>Call connected</span></div>
+            <div class="medicine-mark"><div class="capsule"></div></div>
+            <div class="question">హలో Aakash! B complex medicine వేసుకున్నారా?</div>
+            <div class="actions">
+              <button class="yes">వేసుకున్నా</button>
+              <button class="no">ఇంకా వేసుకోలేదు</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="concept-label"><h2>2. Clinical paper</h2><span>Direct</span></div>
+        <div class="phone clinical">
+          <div class="statusbar"><span>4:37</span><span class="status-icons">◔ 5G ▮▮ 71</span></div>
+          <div class="side-rule"></div>
+          <div class="content">
+            <div class="topline">
+              <div class="medicine-mark"><div class="capsule"></div></div>
+              <div class="identity"><strong>Aakash</strong><span>Call connected</span></div>
+            </div>
+            <div class="question">హలో Aakash!<br>B complex medicine వేసుకున్నారా?</div>
+            <div class="helper">Choose the answer to continue the reminder.</div>
+            <div class="actions">
+              <button class="yes">వేసుకున్నా</button>
+              <button class="no">ఇంకా వేసుకోలేదు</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="concept-label"><h2>3. Morning sky</h2><span>Friendly</span></div>
+        <div class="phone sky">
+          <div class="statusbar"><span>4:37</span><span class="status-icons">◔ 5G ▮▮ 71</span></div>
+          <div class="content">
+            <div class="identity"><strong>Aakash</strong><span class="live">● Call connected</span></div>
+            <div class="medicine-mark"><div class="capsule"></div></div>
+            <div class="question">హలో Aakash! B complex medicine వేసుకున్నారా?</div>
+            <div class="actions">
+              <button class="yes">వేసుకున్నా</button>
+              <button class="no">ఇంకా<br>వేసుకోలేదు</button>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="concept">
+        <div class="concept-label"><h2>4. Quiet garden</h2><span>Minimal</span></div>
+        <div class="phone garden">
+          <div class="statusbar"><span>4:37</span><span class="status-icons">◔ 5G ▮▮ 71</span></div>
+          <div class="leaf one"></div><div class="leaf two"></div>
+          <div class="compact-id"><span class="dot"></span><b>Aakash</b><span>Call connected</span></div>
+          <div class="sheet">
+            <div class="question">హలో Aakash! B complex medicine వేసుకున్నారా?</div>
+            <div class="actions">
+              <button class="yes">వేసుకున్నా</button>
+              <button class="no">ఇంకా వేసుకోలేదు</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
+  </main>
+</body>
+</html>

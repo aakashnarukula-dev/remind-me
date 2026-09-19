@@ -1,0 +1,22 @@
+{
+  "name": "gurthu-chey-functions",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "check": "node --check index.js interpretation.js && node --test voice.test.js interpretation.test.js"
+  },
+  "dependencies": {
+    "@google-cloud/speech": "^8.0.1",
+    "@google-cloud/text-to-speech": "6.4.0",
+    "firebase-admin": "14.3.0",
+    "firebase-functions": "7.3.2",
+    "google-auth-library": "^11.0.2"
+  },
+  "overrides": {
+    "@google-cloud/storage": "8.0.1",
+    "uuid": "11.1.1"
+  }
+}

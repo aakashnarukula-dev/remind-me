@@ -1,0 +1,16 @@
+.gradle/
+.firebase/
+.idea/
+local.properties
+**/build/
+dist/
+toolchain/
+/parent/
+*.jks
+*.keystore
+*.iml
+.DS_Store
+firebase-debug.log
+firebase-debug.*.log
+functions/node_modules/
+*-firebase-adminsdk-*.json

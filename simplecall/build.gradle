@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+    id 'com.google.gms.google-services'
+}
+
+base {
+    archivesName = 'Gurthu-Chey-2.0'
+}
+
+def generatedReminderRingtone = layout.buildDirectory.dir('generated/reminder-ringtone-res')
+
+tasks.register('prepareReminderRingtone', Copy) {
+    from(rootProject.file('parent/src/main/res/raw/incoming_ring.wav'))
+    into(generatedReminderRingtone.map { it.dir('raw') })
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:34.18.0')
+    implementation 'com.google.firebase:firebase-auth'
+    implementation 'com.google.firebase:firebase-firestore'
+    implementation 'com.google.firebase:firebase-messaging'
+    implementation 'androidx.activity:activity:1.10.1'
+    implementation 'androidx.fragment:fragment:1.8.5'
+    implementation 'com.truecaller.android.sdk:truecaller-sdk:3.2.1'
+    testImplementation 'junit:junit:4.13.2'
+}
+
+android {
+    namespace = 'com.gurthuchey.remindercall'
+    compileSdk = 35
+    testBuildType = 'release'
+
+    defaultConfig {
+        applicationId = 'com.gurthuchey.app'
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 67
+        versionName = '2.0'
+        testInstrumentationRunner = 'com.gurthuchey.remindercall.SampleLunchCallInstrumentation'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = true
+            shrinkResources = true
+            signingConfig = signingConfigs.debug
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+
+android.sourceSets.main.res.srcDir(generatedReminderRingtone)
+tasks.named('preBuild').configure { dependsOn(tasks.named('prepareReminderRingtone')) }
+
+android.applicationVariants.configureEach { variant ->
+    if (variant.buildType.name == 'release') {
+        variant.outputs.configureEach {
+            outputFileName = 'Gurthu-Chey-2.0.apk'
+        }
+    }
+}
