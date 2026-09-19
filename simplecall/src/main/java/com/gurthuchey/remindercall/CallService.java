@@ -899,7 +899,7 @@ public final class CallService extends Service {
     }
 
     private boolean customCall() {
-        return activeSchedule != null && activeSchedule.custom()
+        return activeSchedule != null && activeSchedule.scripted()
                 && ReminderScheduler.PHASE_MEDICINE.equals(phase);
     }
 

@@ -224,6 +224,8 @@ final class RemoteStore {
 
         boolean custom() { return !"medicine".equals(category); }
 
+        boolean scripted() { return !questions.isEmpty(); }
+
         String detectedLanguage() {
             StringBuilder text = new StringBuilder(label == null ? "" : label);
             for (ScriptQuestion question : questions) {
