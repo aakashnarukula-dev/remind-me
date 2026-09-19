@@ -156,6 +156,14 @@ test("reminder title placeholder follows later title edits", () => {
     "Hello Aakash! Time for Collagen drink.");
 });
 
+test("category placeholder follows current reminder category", () => {
+  assert.equal(
+    voice.customText("Hi [Name]. It's time for your [Reminder title] [category].",
+      "Aakash", "Collagen drink", "en", "drink"),
+    "Hi Aakash. It's time for your Collagen drink drink.");
+  assert.equal(voice.categoryName("supplement", "en"), "supplement");
+});
+
 test("unknown future categories stay generic instead of becoming medicine", () => {
   const texts = voice.voiceTexts({
     name: "అమ్మా",

@@ -168,11 +168,11 @@ final class VoiceClipCache {
             if (schedule.scripted()) {
                 for (RemoteStore.ScriptQuestion question : schedule.questions) {
                     String prompt = SpeechText.custom(question.prompt,
-                            config.memberName, schedule.label, language);
+                            config.memberName, schedule.label, schedule.category, language);
                     add(values, prompt, language);
                     for (RemoteStore.ScriptAnswer answer : question.answers) {
                         String response = SpeechText.custom(answer.response,
-                                config.memberName, schedule.label, language);
+                                config.memberName, schedule.label, schedule.category, language);
                         add(values, response, language);
                     }
                 }
