@@ -605,8 +605,8 @@ public final class MainActivity extends FragmentActivity {
 
         String currentPeriod = "";
         for (RemoteStore.Schedule schedule : visibleSchedules) {
-            String period = periodIcon(schedule.hour) + "  "
-                    + AppLanguage.timePeriod(currentLanguage(), schedule.hour);
+            String period = periodIcon(schedule.hour, schedule.minute) + "  "
+                    + AppLanguage.timePeriod(currentLanguage(), schedule.hour, schedule.minute);
             if (!period.equals(currentPeriod)) {
                 TextView label = Ui.text(this, period, 12, Ui.MUTED, true);
                 LinearLayout.LayoutParams labelParams = Ui.matchWrap();
@@ -1027,10 +1027,11 @@ public final class MainActivity extends FragmentActivity {
         return CATEGORY_VALUES.length - 1;
     }
 
-    private String periodIcon(int hour) {
-        if (hour >= 5 && hour < 12) return "🌅";
-        if (hour >= 12 && hour < 17) return "☀️";
-        if (hour >= 17 && hour < 21) return "🌇";
+    private String periodIcon(int hour, int minute) {
+        int minutesAfterMidnight = hour * 60 + minute;
+        if (minutesAfterMidnight >= 5 * 60 && minutesAfterMidnight < 12 * 60) return "🌅";
+        if (minutesAfterMidnight >= 12 * 60 && minutesAfterMidnight < 16 * 60) return "☀️";
+        if (minutesAfterMidnight >= 16 * 60 && minutesAfterMidnight <= 19 * 60) return "🌇";
         return "🌙";
     }
 
