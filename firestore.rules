@@ -1,0 +1,215 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isPrimaryAdmin(familyId) {
+      return signedIn()
+        && request.auth.token.phone_number == "+919177216132"
+        && exists(/databases/$(database)/documents/adminConfig/primary)
+        && get(/databases/$(database)/documents/adminConfig/primary).data.familyId == familyId;
+    }
+
+    function isOwner(familyId) {
+      return isPrimaryAdmin(familyId);
+    }
+
+    function pairedFor(familyId, memberId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/families/$(familyId)/devices/$(request.auth.uid))
+        && get(/databases/$(database)/documents/families/$(familyId)/devices/$(request.auth.uid)).data.memberId == memberId;
+    }
+
+    function validPairingCode(familyId) {
+      let code = request.resource.data.pairingCode;
+      return signedIn()
+        && code is string
+        && code.matches('^[0-9]{6}$')
+        && existsAfter(/databases/$(database)/documents/pairingCodes/$(code))
+        && getAfter(/databases/$(database)/documents/pairingCodes/$(code)).data.usedByUid == request.auth.uid
+        && getAfter(/databases/$(database)/documents/pairingCodes/$(code)).data.familyId == familyId
+        && getAfter(/databases/$(database)/documents/pairingCodes/$(code)).data.memberId == request.resource.data.memberId
+        && getAfter(/databases/$(database)/documents/pairingCodes/$(code)).data.expiresAt > request.time
+        && request.resource.data.status == "assigned";
+    }
+
+    function validPhoneAssignment(familyId) {
+      let assignmentId = request.resource.data.assignmentId;
+      return signedIn()
+        && request.auth.token.phone_number is string
+        && assignmentId is string
+        && assignmentId.matches('^[0-9a-f]{64}$')
+        && exists(/databases/$(database)/documents/phoneAssignments/$(assignmentId))
+        && get(/databases/$(database)/documents/phoneAssignments/$(assignmentId)).data.familyId == familyId
+        && get(/databases/$(database)/documents/phoneAssignments/$(assignmentId)).data.memberId == request.resource.data.memberId
+        && get(/databases/$(database)/documents/phoneAssignments/$(assignmentId)).data.phoneE164 == request.auth.token.phone_number
+        && request.resource.data.status == "assigned";
+    }
+
+    match /pairingCodes/{code} {
+      allow get: if signedIn()
+        && resource.data.usedByUid == ""
+        && resource.data.expiresAt > request.time;
+      allow list: if false;
+      allow create: if signedIn()
+        && code.matches('^[0-9]{6}$')
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.usedByUid == ""
+        && request.resource.data.familyId is string
+        && request.resource.data.memberId is string
+        && isOwner(request.resource.data.familyId)
+        && exists(/databases/$(database)/documents/families/$(request.resource.data.familyId)/members/$(request.resource.data.memberId))
+        && request.resource.data.expiresAt > request.time;
+      allow update: if signedIn()
+        && resource.data.usedByUid == ""
+        && resource.data.expiresAt > request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["usedByUid", "usedAt"])
+        && request.resource.data.usedByUid == request.auth.uid;
+      allow delete: if isOwner(resource.data.familyId);
+    }
+
+    match /setup/{setupId} {
+      allow read, write: if false;
+    }
+
+    match /adminConfig/{configId} {
+      allow get: if configId == "primary"
+        && signedIn()
+        && request.auth.token.phone_number == "+919177216132";
+      allow list, create, update, delete: if false;
+    }
+
+    match /phoneAssignments/{assignmentId} {
+      allow get: if (signedIn()
+        && request.auth.token.phone_number is string
+        && resource.data.phoneE164 == request.auth.token.phone_number)
+        || isOwner(resource.data.familyId);
+      allow list: if isOwner(resource.data.familyId);
+      allow create: if isOwner(request.resource.data.familyId);
+      allow update: if isOwner(resource.data.familyId)
+        && isOwner(request.resource.data.familyId);
+      allow delete: if isOwner(resource.data.familyId);
+    }
+
+    match /truecallerRequests/{uid} {
+      allow create: if signedIn() && uid == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          "role", "code", "codeVerifier", "state", "createdAt"
+        ])
+        && request.resource.data.role in ["admin", "user"]
+        && request.resource.data.code is string
+        && request.resource.data.code.size() >= 8
+        && request.resource.data.code.size() <= 4096
+        && request.resource.data.codeVerifier is string
+        && request.resource.data.codeVerifier.size() >= 43
+        && request.resource.data.codeVerifier.size() <= 256
+        && request.resource.data.state is string
+        && request.resource.data.state.size() >= 16
+        && request.resource.data.state.size() <= 128
+        && request.resource.data.createdAt == request.time;
+      allow delete: if signedIn() && uid == request.auth.uid;
+      allow read, update: if false;
+    }
+
+    match /truecallerResults/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow delete: if signedIn() && uid == request.auth.uid;
+      allow list, create, update: if false;
+    }
+
+    match /families/{familyId} {
+      allow create: if isPrimaryAdmin(familyId)
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.pairSecret is string
+        && request.resource.data.pairSecret.size() >= 24;
+      allow read, update, delete: if isOwner(familyId);
+
+      match /members/{memberId} {
+        allow read: if isOwner(familyId) || pairedFor(familyId, memberId);
+        allow create, delete: if isOwner(familyId);
+        allow update: if isOwner(familyId) || (
+          pairedFor(familyId, memberId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["schedules", "revision", "updatedAt"])
+          && request.resource.data.schedules is list
+          && request.resource.data.schedules.size() <= 50
+          && request.resource.data.revision == resource.data.revision + 1
+          && request.resource.data.updatedAt == request.time
+        );
+
+        match /voiceClips/{clipId} {
+          allow read: if isOwner(familyId) || pairedFor(familyId, memberId);
+          allow write: if false;
+        }
+      }
+
+      match /devices/{deviceId} {
+        allow read: if isOwner(familyId) || (signedIn() && deviceId == request.auth.uid);
+        allow create: if signedIn()
+          && deviceId == request.auth.uid
+          && (validPairingCode(familyId) || validPhoneAssignment(familyId));
+        allow update: if isOwner(familyId) || (
+          signedIn()
+          && deviceId == request.auth.uid
+          && (
+            (
+              request.resource.data.memberId == resource.data.memberId
+              && request.resource.data.status == resource.data.status
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                "fcmToken", "model", "platform", "appVersion", "deviceKey", "updatedAt"
+              ])
+            ) || validPairingCode(familyId) || validPhoneAssignment(familyId)
+          )
+        );
+        allow delete: if isOwner(familyId) || (signedIn() && deviceId == request.auth.uid);
+
+        match /speechRequests/{requestId} {
+          allow create: if signedIn()
+            && deviceId == request.auth.uid
+            && get(/databases/$(database)/documents/families/$(familyId)/devices/$(deviceId)).data.status == "assigned"
+            && request.resource.data.memberId == get(/databases/$(database)/documents/families/$(familyId)/devices/$(deviceId)).data.memberId
+            && request.resource.data.keys().hasOnly([
+              "memberId", "phase", "waiting", "duringPrompt", "promptText",
+              "audioBase64", "fast", "transcript", "textOnly", "createdAt"
+            ])
+            && request.resource.data.memberId is string
+            && request.resource.data.phase in ["medicine", "meal"]
+            && request.resource.data.waiting is bool
+            && request.resource.data.duringPrompt is bool
+            && (!("fast" in request.resource.data) || request.resource.data.fast == true)
+            && (!("promptText" in request.resource.data) || (
+              request.resource.data.promptText is string
+              && request.resource.data.promptText.size() <= 300
+            ))
+            && (
+              (
+                !("textOnly" in request.resource.data)
+                && request.resource.data.audioBase64 is string
+                && request.resource.data.audioBase64.size() >= 100
+                && request.resource.data.audioBase64.size() <= 700000
+                && !("transcript" in request.resource.data)
+              ) || (
+                request.resource.data.textOnly == true
+                && request.resource.data.transcript is string
+                && request.resource.data.transcript.size() >= 1
+                && request.resource.data.transcript.size() <= 300
+                && !("audioBase64" in request.resource.data)
+                && !("fast" in request.resource.data)
+              )
+            )
+            && request.resource.data.createdAt == request.time;
+          allow read, update: if false;
+          allow delete: if signedIn() && deviceId == request.auth.uid;
+        }
+
+        match /speechResults/{requestId} {
+          allow read, delete: if signedIn() && deviceId == request.auth.uid;
+          allow create, update: if false;
+        }
+      }
+    }
+  }
+}
