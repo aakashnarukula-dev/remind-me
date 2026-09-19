@@ -82,9 +82,14 @@ public final class MainActivity extends FragmentActivity {
     private boolean authBusy;
     private boolean truecallerAutoAttempted;
     private boolean scheduleListenerRegistered;
+    private ScrollView mainScroll;
+    private RemoteStore.Config optimisticConfig;
     private final SharedPreferences.OnSharedPreferenceChangeListener scheduleListener =
             (preferences, key) -> {
-                if (key == null || "config".equals(key)) render();
+                if (key == null || "config".equals(key)) {
+                    optimisticConfig = null;
+                    render();
+                }
             };
 
     private void applyLightSystemBars(Window window) {
@@ -150,13 +155,14 @@ public final class MainActivity extends FragmentActivity {
 
     private void render() {
         RemoteStore store = remoteStore == null ? new RemoteStore(this) : remoteStore;
-        RemoteStore.Config config = store.load();
+        RemoteStore.Config config = optimisticConfig == null ? store.load() : optimisticConfig;
         boolean paired = store.pairing() != null;
 
         if (phoneLogin == null || !phoneLogin.isSignedInWithPhone() || !paired) {
             renderLogin();
             return;
         }
+        int previousScrollY = mainScroll == null ? 0 : mainScroll.getScrollY();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Ui.BG);
@@ -184,7 +190,9 @@ public final class MainActivity extends FragmentActivity {
         scroll.addView(body);
         page.addView(scroll, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        mainScroll = scroll;
         setContentView(page);
+        scroll.post(() -> scroll.scrollTo(0, previousScrollY));
     }
 
     private View buildHomeHeader() {
@@ -207,7 +215,8 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout words = new LinearLayout(this);
         words.setOrientation(LinearLayout.VERTICAL);
         words.addView(Ui.text(this, AppLanguage.title(currentLanguage()), 20, Ui.INK, true));
-        RemoteStore.Config config = remoteStore == null ? null : remoteStore.load();
+        RemoteStore.Config config = optimisticConfig != null
+                ? optimisticConfig : remoteStore == null ? null : remoteStore.load();
         header.addView(words, new LinearLayout.LayoutParams(
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView add = Ui.text(this, "+", 25, Ui.INK, false);
@@ -307,6 +316,8 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void renderLogin() {
+        mainScroll = null;
+        optimisticConfig = null;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         android.widget.FrameLayout root = new android.widget.FrameLayout(this);
         root.setBackgroundColor(Ui.BG);
@@ -675,6 +686,7 @@ public final class MainActivity extends FragmentActivity {
             return;
         }
         RemoteStore.Schedule draft = copySchedule(existing);
+        boolean[] automaticConversation = {existing == null};
         normalizeReminderTitlePlaceholders(draft);
 
         Dialog dialog = new Dialog(this);
@@ -710,8 +722,8 @@ public final class MainActivity extends FragmentActivity {
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Delete", (ignored, which) -> {
                         config.schedules.remove(existing);
-                        saveOwnSchedules(config);
                         dialog.dismiss();
+                        saveOwnSchedules(config);
                     }).show());
             LinearLayout.LayoutParams deleteParams = new LinearLayout.LayoutParams(
                     Ui.dp(this, 82), Ui.dp(this, 42));
@@ -756,8 +768,9 @@ public final class MainActivity extends FragmentActivity {
                 for (int i = 0; i < categoryChoices.length; i++) {
                     styleCategoryChoice(categoryChoices[i], i == choice);
                 }
-                if (!"medicine".equals(draft.category) && draft.questions.isEmpty()) {
-                    draft.questions.add(defaultQuestion(currentLanguage()));
+                if (automaticConversation[0]) {
+                    draft.questions.clear();
+                    draft.questions.add(defaultQuestion(draft.category));
                 }
                 if (updateCategoryUi[0] != null) updateCategoryUi[0].run();
             });
@@ -892,8 +905,10 @@ public final class MainActivity extends FragmentActivity {
         conversationButton.setElevation(0);
         conversationButton.setTranslationZ(0);
         conversationButton.setStateListAnimator(null);
-        conversationButton.setOnClickListener(v -> showQuestionsDialog(draft,
-                () -> updateConversationSummary(conversationButton, draft)));
+        conversationButton.setOnClickListener(v -> showQuestionsDialog(draft, () -> {
+            automaticConversation[0] = false;
+            updateConversationSummary(conversationButton, draft);
+        }));
         conversation.addView(conversationButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
         form.addView(conversation);
@@ -904,7 +919,7 @@ public final class MainActivity extends FragmentActivity {
             reminderNameLabel.setText(isMedicine ? "Medicine name" : "Reminder title");
             medicine.setHint(isMedicine ? "Example: Metformin" : "Example: Pay electricity bill");
             medicineOptions.setVisibility(isMedicine ? View.VISIBLE : View.GONE);
-            conversation.setVisibility(isMedicine ? View.GONE : View.VISIBLE);
+            conversation.setVisibility(View.VISIBLE);
             updateConversationSummary(conversationButton, draft);
         };
         updateCategoryUi[0].run();
@@ -931,7 +946,8 @@ public final class MainActivity extends FragmentActivity {
                 Toast.makeText(this, "Choose at least one day", Toast.LENGTH_SHORT).show();
                 return;
             }
-            if (!medicineReminder && !validConversation(draft)) {
+            if ((existing == null || !medicineReminder || !draft.questions.isEmpty())
+                    && !validConversation(draft)) {
                 Toast.makeText(this, "Add at least one question",
                         Toast.LENGTH_LONG).show();
                 return;
@@ -950,8 +966,8 @@ public final class MainActivity extends FragmentActivity {
                 int index = config.schedules.indexOf(existing);
                 if (index >= 0) config.schedules.set(index, draft);
             }
-            saveOwnSchedules(config);
             dialog.dismiss();
+            saveOwnSchedules(config);
         });
         sheet.addView(save, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 52)));
@@ -974,8 +990,11 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void saveOwnSchedules(RemoteStore.Config config) {
+        optimisticConfig = config;
+        render();
         sync.saveOwnSchedules(config, (success, message) -> runOnUiThread(() -> {
             status = message;
+            if (!success) optimisticConfig = null;
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
             render();
         }));
@@ -994,6 +1013,7 @@ public final class MainActivity extends FragmentActivity {
             copy.preMinutes = 30;
             copy.confirmationMinutes = 0;
             copy.enabled = true;
+            copy.questions.add(defaultQuestion(copy.category));
             return copy;
         }
         copy.id = source.id;
@@ -1170,46 +1190,12 @@ public final class MainActivity extends FragmentActivity {
         return normalized.replace(marker, "[Reminder title]");
     }
 
-    private RemoteStore.ScriptQuestion defaultQuestion(String language) {
+    private RemoteStore.ScriptQuestion defaultQuestion(String category) {
         RemoteStore.ScriptQuestion question = new RemoteStore.ScriptQuestion();
         RemoteStore.ScriptAnswer answer = new RemoteStore.ScriptAnswer();
-        switch (AppLanguage.normalize(language)) {
-            case "en":
-                question.prompt = "Hello [Name]! I’m calling to remind you about [Reminder title]. "
-                        + "If you understood, tap “Okay”.";
-                answer.label = "Okay";
-                answer.response = "Okay. Bye!";
-                break;
-            case "hi":
-                question.prompt = "नमस्ते [Name]! मैं [Reminder title] की याद दिलाने के लिए कॉल कर रही हूँ। "
-                        + "समझ में आया तो “ठीक है” दबाएँ।";
-                answer.label = "ठीक है";
-                answer.response = "ठीक है। बाय!";
-                break;
-            case "ta":
-                question.prompt = "வணக்கம் [Name]! [Reminder title] பற்றி நினைவூட்ட அழைத்தேன். "
-                        + "புரிந்தால் “சரி” பொத்தானை அழுத்துங்கள்.";
-                answer.label = "சரி";
-                answer.response = "சரி. பை!";
-                break;
-            case "kn":
-                question.prompt = "ನಮಸ್ಕಾರ [Name]! [Reminder title] ಬಗ್ಗೆ ನೆನಪಿಸಲು ಕರೆ ಮಾಡಿದ್ದೇನೆ. "
-                        + "ಅರ್ಥವಾದರೆ “ಸರಿ” ಬಟನ್ ಒತ್ತಿರಿ.";
-                answer.label = "ಸರಿ";
-                answer.response = "ಸರಿ. ಬೈ!";
-                break;
-            case "ml":
-                question.prompt = "നമസ്കാരം [Name]! [Reminder title] ഓർമ്മിപ്പിക്കാനാണ് വിളിച്ചത്. "
-                        + "മനസ്സിലായെങ്കിൽ “ശരി” ബട്ടൺ അമർത്തുക.";
-                answer.label = "ശരി";
-                answer.response = "ശരി. ബൈ!";
-                break;
-            default:
-                question.prompt = "హలో [Name]! [Reminder title] గురించి గుర్తు చేయడానికి కాల్ చేశాను. "
-                        + "అర్థమైతే “సరే” బటన్ నొక్కండి.";
-                answer.label = "సరే";
-                answer.response = "సరే. Bye!";
-        }
+        question.prompt = ConversationDefaults.prompt(category);
+        answer.label = "Okay";
+        answer.response = "";
         question.answers.add(answer);
         return question;
     }
@@ -1276,15 +1262,6 @@ public final class MainActivity extends FragmentActivity {
         close.setOnClickListener(v -> dialog.dismiss());
         header.addView(close, new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42)));
         sheet.addView(header);
-
-        TextView help = Ui.text(this,
-                "Write exactly as Chitti should speak, in any supported language. "
-                        + "Use [Name] and [Reminder title] where needed. "
-                        + "After an answer, its response plays and the next question starts.",
-                13, Ui.MUTED, false);
-        help.setLineSpacing(0, 1.15f);
-        sheet.addView(help, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 6, 0, 10));
 
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);

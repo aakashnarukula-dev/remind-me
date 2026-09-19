@@ -71,6 +71,7 @@ public final class MainActivity extends FragmentActivity {
     private PhoneLogin phoneLogin;
     private AdminFirebase firebase;
     private LinearLayout page;
+    private ScrollView mainScroll;
     private boolean firebaseReady;
     private boolean backendListenersStarted;
     private boolean adminStarted;
@@ -154,6 +155,7 @@ public final class MainActivity extends FragmentActivity {
             renderSignIn();
             return;
         }
+        int previousScrollY = mainScroll == null ? 0 : mainScroll.getScrollY();
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Ui.PAPER);
         root.setClipChildren(false);
@@ -185,10 +187,13 @@ public final class MainActivity extends FragmentActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
 
         if (!members.isEmpty()) buildMemberSection();
+        mainScroll = scroll;
         setContentView(root);
+        scroll.post(() -> scroll.scrollTo(0, previousScrollY));
     }
 
     private void renderSignIn() {
+        mainScroll = null;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         FrameLayout root = new FrameLayout(this);
         root.setBackgroundColor(Ui.BG);
@@ -1152,7 +1157,9 @@ public final class MainActivity extends FragmentActivity {
         if (existing == null) {
             draft.label = "";
             draft.language = "en";
+            draft.questions.add(defaultQuestion(draft.category));
         }
+        boolean[] automaticConversation = {existing == null};
         normalizeReminderTitlePlaceholders(draft);
 
         Dialog dialog = new Dialog(this);
@@ -1229,8 +1236,9 @@ public final class MainActivity extends FragmentActivity {
                 for (int i = 0; i < categoryChoices.length; i++) {
                     styleCategoryChoice(categoryChoices[i], i == choice);
                 }
-                if (!"medicine".equals(draft.category) && draft.questions.isEmpty()) {
-                    draft.questions.add(defaultQuestion("en"));
+                if (automaticConversation[0]) {
+                    draft.questions.clear();
+                    draft.questions.add(defaultQuestion(draft.category));
                 }
                 if (updateCategoryUi[0] != null) updateCategoryUi[0].run();
             });
@@ -1369,8 +1377,10 @@ public final class MainActivity extends FragmentActivity {
         conversationButton.setElevation(0);
         conversationButton.setTranslationZ(0);
         conversationButton.setStateListAnimator(null);
-        conversationButton.setOnClickListener(v -> showQuestionsDialog(draft,
-                () -> updateConversationSummary(conversationButton, draft)));
+        conversationButton.setOnClickListener(v -> showQuestionsDialog(draft, () -> {
+            automaticConversation[0] = false;
+            updateConversationSummary(conversationButton, draft);
+        }));
         conversation.addView(conversationButton, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
         form.addView(conversation);
@@ -1381,7 +1391,7 @@ public final class MainActivity extends FragmentActivity {
             reminderNameLabel.setText(isMedicine ? "Medicine name" : "Reminder title");
             medicine.setHint(isMedicine ? "Example: Metformin" : "Example: Pay electricity bill");
             medicineOptions.setVisibility(isMedicine ? View.VISIBLE : View.GONE);
-            conversation.setVisibility(isMedicine ? View.GONE : View.VISIBLE);
+            conversation.setVisibility(View.VISIBLE);
             updateConversationSummary(conversationButton, draft);
         };
         updateCategoryUi[0].run();
@@ -1416,7 +1426,8 @@ public final class MainActivity extends FragmentActivity {
             draft.days = dayMask;
             draft.preMinutes = isMedicine ? selectedLead[0] : 0;
             draft.confirmationMinutes = selectedConfirmation[0];
-            if (!isMedicine && !validConversation(draft)) {
+            if ((existing == null || !isMedicine || !draft.questions.isEmpty())
+                    && !validConversation(draft)) {
                 Toast.makeText(this, "Add at least one question",
                         Toast.LENGTH_LONG).show();
                 return;
@@ -1431,8 +1442,8 @@ public final class MainActivity extends FragmentActivity {
                 int index = member.schedules.indexOf(existing);
                 if (index >= 0) member.schedules.set(index, draft);
             }
-            persistAndRender();
             dialog.dismiss();
+            persistAndRender();
         });
         sheet.addView(save, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 52)));
@@ -1620,35 +1631,12 @@ public final class MainActivity extends FragmentActivity {
         return normalized.replace(marker, "[Reminder title]");
     }
 
-    private Models.ScriptQuestion defaultQuestion(String language) {
+    private Models.ScriptQuestion defaultQuestion(String category) {
         Models.ScriptQuestion question = new Models.ScriptQuestion();
         Models.ScriptAnswer answer = new Models.ScriptAnswer();
-        switch (AppLanguage.normalize(language)) {
-            case "en":
-                question.prompt = "Hello [Name]! I’m calling to remind you about [Reminder title]. "
-                        + "If you understood, tap “Okay”.";
-                answer.label = "Okay"; answer.response = "Okay. Bye!"; break;
-            case "hi":
-                question.prompt = "नमस्ते [Name]! मैं [Reminder title] की याद दिलाने के लिए कॉल कर रही हूँ। "
-                        + "समझ में आया तो “ठीक है” दबाएँ।";
-                answer.label = "ठीक है"; answer.response = "ठीक है। बाय!"; break;
-            case "ta":
-                question.prompt = "வணக்கம் [Name]! [Reminder title] பற்றி நினைவூட்ட அழைத்தேன். "
-                        + "புரிந்தால் “சரி” பொத்தானை அழுத்துங்கள்.";
-                answer.label = "சரி"; answer.response = "சரி. பை!"; break;
-            case "kn":
-                question.prompt = "ನಮಸ್ಕಾರ [Name]! [Reminder title] ಬಗ್ಗೆ ನೆನಪಿಸಲು ಕರೆ ಮಾಡಿದ್ದೇನೆ. "
-                        + "ಅರ್ಥವಾದರೆ “ಸರಿ” ಬಟನ್ ಒತ್ತಿರಿ.";
-                answer.label = "ಸರಿ"; answer.response = "ಸರಿ. ಬೈ!"; break;
-            case "ml":
-                question.prompt = "നമസ്കാരം [Name]! [Reminder title] ഓർമ്മിപ്പിക്കാനാണ് വിളിച്ചത്. "
-                        + "മനസ്സിലായെങ്കിൽ “ശരി” ബട്ടൺ അമർത്തുക.";
-                answer.label = "ശരി"; answer.response = "ശരി. ബൈ!"; break;
-            default:
-                question.prompt = "హలో [Name]! [Reminder title] గురించి గుర్తు చేయడానికి కాల్ చేశాను. "
-                        + "అర్థమైతే “సరే” బటన్ నొక్కండి.";
-                answer.label = "సరే"; answer.response = "సరే. Bye!";
-        }
+        question.prompt = ConversationDefaults.prompt(category);
+        answer.label = "Okay";
+        answer.response = "";
         question.answers.add(answer);
         return question;
     }
@@ -1711,15 +1699,6 @@ public final class MainActivity extends FragmentActivity {
         close.setOnClickListener(v -> dialog.dismiss());
         header.addView(close, new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42)));
         sheet.addView(header);
-        TextView help = Ui.text(this,
-                "Write exactly as Chitti should speak, in any supported language. "
-                        + "Use [Name] and [Reminder title] where needed. "
-                        + "After an answer, its response plays and next question starts.",
-                13, Ui.MUTED, false);
-        help.setLineSpacing(0, 1.15f);
-        sheet.addView(help, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 6, 0, 10));
-
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
         renderQuestionList(list, schedule, dialog, changed);

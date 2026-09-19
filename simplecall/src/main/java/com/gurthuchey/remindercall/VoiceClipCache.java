@@ -165,7 +165,7 @@ final class VoiceClipCache {
         for (RemoteStore.Schedule schedule : config.schedules) {
             if (!schedule.enabled) continue;
             String language = AppLanguage.normalize(schedule.language);
-            if (schedule.custom()) {
+            if (schedule.scripted()) {
                 for (RemoteStore.ScriptQuestion question : schedule.questions) {
                     String prompt = SpeechText.custom(question.prompt,
                             config.memberName, schedule.label, language);
@@ -176,18 +176,21 @@ final class VoiceClipCache {
                         add(values, response, language);
                     }
                 }
-            } else {
-                add(values, SpeechText.medicineQuestion(config.memberName,
-                        schedule.label, language), language);
+            }
+            if (!schedule.custom()) {
+                if (!schedule.scripted()) {
+                    add(values, SpeechText.medicineQuestion(config.memberName,
+                            schedule.label, language), language);
+                    add(values, SpeechText.medicineTaken(config.memberName, language), language);
+                    add(values, SpeechText.medicineNotTaken(language), language);
+                    add(values, SpeechText.reminderDelayQuestion(language), language);
+                    for (int minutes : CallService.DELAY_MINUTES) {
+                        add(values, SpeechText.reminderDelayed(minutes, language), language);
+                    }
+                }
                 if (schedule.preMinutes > 0) {
                     add(values, SpeechText.mealQuestion(config.memberName, schedule.label,
                             schedule.hour < 12, schedule.preMinutes, language), language);
-                }
-                add(values, SpeechText.medicineTaken(config.memberName, language), language);
-                add(values, SpeechText.medicineNotTaken(language), language);
-                add(values, SpeechText.reminderDelayQuestion(language), language);
-                for (int minutes : CallService.DELAY_MINUTES) {
-                    add(values, SpeechText.reminderDelayed(minutes, language), language);
                 }
             }
             if (schedule.confirmationMinutes > 0) {

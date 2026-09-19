@@ -56,6 +56,18 @@ public final class RemoteStoreCategoryTest {
         assertEquals("medicine", RemoteStore.Schedule.fromRemote(schedule).category);
     }
 
+    @Test public void medicineWithConversationUsesScriptedCall() {
+        Map<String, Object> schedule = baseSchedule("medicine");
+        schedule.put("questions", List.of(Map.of(
+                "prompt", ConversationDefaults.prompt("medicine"),
+                "answers", List.of(answer("Okay", "")))));
+
+        RemoteStore.Schedule parsed = RemoteStore.Schedule.fromRemote(schedule);
+
+        assertTrue(parsed.scripted());
+        assertEquals("Okay", parsed.questions.get(0).answers.get(0).label);
+    }
+
     @Test public void confirmationSettingDefaultsOffAndParsesWhenEnabled() {
         Map<String, Object> legacy = baseSchedule(null);
         assertEquals(0, RemoteStore.Schedule.fromRemote(legacy).confirmationMinutes);
