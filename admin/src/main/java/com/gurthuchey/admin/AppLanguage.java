@@ -77,12 +77,14 @@ final class AppLanguage {
         return count + " " + ui(context, noun);
     }
 
-    static String timePeriod(Context context, int hour) {
+    static String timePeriod(Context context, int hour, int minute) {
         String code = current(context);
         int normalizedHour = Math.max(0, Math.min(23, hour));
-        int period = normalizedHour >= 5 && normalizedHour < 12 ? 0
-                : normalizedHour >= 12 && normalizedHour < 17 ? 1
-                : normalizedHour >= 17 && normalizedHour < 21 ? 2 : 3;
+        int normalizedMinute = Math.max(0, Math.min(59, minute));
+        int minutesAfterMidnight = normalizedHour * 60 + normalizedMinute;
+        int period = minutesAfterMidnight >= 5 * 60 && minutesAfterMidnight < 12 * 60 ? 0
+                : minutesAfterMidnight >= 12 * 60 && minutesAfterMidnight < 16 * 60 ? 1
+                : minutesAfterMidnight >= 16 * 60 && minutesAfterMidnight <= 19 * 60 ? 2 : 3;
         String[][] names = {
                 {"Morning", "Afternoon", "Evening", "Night"},
                 {"ఉదయం", "మధ్యాహ్నం", "సాయంత్రం", "రాత్రి"},
