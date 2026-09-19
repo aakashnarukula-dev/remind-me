@@ -62,7 +62,6 @@ public final class MainActivity extends FragmentActivity {
     private static final String PERMISSION_PREFS = "permission_prompts";
     private static final String NOTIFICATION_PERMISSION_REQUESTED =
             "notification_permission_requested";
-    private static final float REMINDER_SHEET_HEIGHT_RATIO = 0.94f;
     private static final String[] CATEGORY_NAMES = {
             "💊  Medicine", "Supplement", "🥣  Meal", "🥤  Drink",
             "🏃  Exercise", "📅  Appointment", "₹  Bill or payment",
@@ -970,9 +969,8 @@ public final class MainActivity extends FragmentActivity {
             window.setWindowAnimations(R.style.BottomSheetAnimation);
         }
         dialog.show();
-        if (window != null) window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT,
-                Math.round(getResources().getDisplayMetrics().heightPixels
-                        * REMINDER_SHEET_HEIGHT_RATIO));
+        if (window != null) window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private void saveOwnSchedules(RemoteStore.Config config) {
