@@ -52,7 +52,6 @@ import java.util.Map;
 import java.util.Set;
 
 public final class MainActivity extends FragmentActivity {
-    private static final float REMINDER_SHEET_HEIGHT_RATIO = 0.94f;
     private static final String[] CATEGORY_NAMES = {
             "💊  Medicine", "Supplement", "🥣  Meal", "🥤  Drink",
             "🏃  Exercise", "📅  Appointment", "₹  Bill or payment",
@@ -1451,11 +1450,8 @@ public final class MainActivity extends FragmentActivity {
             window.setWindowAnimations(R.style.BottomSheetAnimation);
         }
         dialog.show();
-        if (window != null) {
-            int height = Math.round(getResources().getDisplayMetrics().heightPixels
-                    * REMINDER_SHEET_HEIGHT_RATIO);
-            window.setLayout(ViewGroup.LayoutParams.MATCH_PARENT, height);
-        }
+        if (window != null) window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private int categoryIndex(String value) {
