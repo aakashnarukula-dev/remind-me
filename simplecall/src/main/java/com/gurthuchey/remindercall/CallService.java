@@ -35,6 +35,7 @@ public final class CallService extends Service {
     static final String ACTION_ANSWER = "com.gurthuchey.remindercall.ANSWER";
     static final String ACTION_REJECT = "com.gurthuchey.remindercall.REJECT";
     static final String ACTION_OPTION = "com.gurthuchey.remindercall.OPTION";
+    static final String ACTION_DELAY = "com.gurthuchey.remindercall.DELAY";
     static final String ACTION_END = "com.gurthuchey.remindercall.END";
     static final String ACTION_SILENCE = "com.gurthuchey.remindercall.SILENCE";
     static final String ACTION_RESTORE_NOTIFICATION =
@@ -159,6 +160,8 @@ public final class CallService extends Service {
         else if (ACTION_ANSWER.equals(action)) answer();
         else if (ACTION_REJECT.equals(action)) reject(false);
         else if (ACTION_OPTION.equals(action)) choose(intent.getIntExtra(EXTRA_OPTION, -1),
+                intent.getIntExtra(EXTRA_OPTION_STEP, -1));
+        else if (ACTION_DELAY.equals(action)) chooseDelay(intent.getIntExtra(EXTRA_OPTION, -1),
                 intent.getIntExtra(EXTRA_OPTION_STEP, -1));
         else if (ACTION_END.equals(action)) reject(false);
         else if (ACTION_SILENCE.equals(action)) silenceRinging();
@@ -352,6 +355,18 @@ public final class CallService extends Service {
             }
             finishWithResponse(SpeechText.reminderDelayed(delay, language));
         }
+    }
+
+    private void chooseDelay(int option, int expectedStep) {
+        if (!active || !answered || finalizing || transitioning || !customCall()
+                || expectedStep != step || option < 0 || option >= DELAY_MINUTES.length) return;
+        handler.removeCallbacks(unansweredQuestion);
+        int delay = DELAY_MINUTES[option];
+        if (!"test-call".equals(scheduleId)) {
+            ReminderScheduler.scheduleRetryAfter(this, scheduleId, phase,
+                    label, member, preMinutes, delay);
+        }
+        finishWithResponse(SpeechText.reminderDelayed(delay, language));
     }
 
     private void announceDelayQuestion() {
