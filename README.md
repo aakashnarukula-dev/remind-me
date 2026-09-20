@@ -21,6 +21,7 @@ Each member has one Admin-assigned Indian mobile number. When that number signs 
 - Reminder categories are Medicine, Appointment, Bill or payment, Exercise, Meal, Task, Wake-up, and Custom.
 - Medicine keeps its tested dose flow. Every other category uses the ordered questions, answer buttons, and spoken responses written in Admin.
 - Custom scripts can use `[Name]` and `[Reminder]`; both placeholders are resolved before Telugu voice generation.
+- Every scripted question includes a built-in, localized **Remind me later** answer. It asks for 5, 15, 30, or 60 minutes and schedules a one-time offline callback without changing the regular schedule.
 - A configurable meal call can run 15, 30, 45, or 60 minutes before a medicine dose, or be turned off.
 - Morning meal calls say `టిఫిన్`; afternoon and evening calls say `భోజనం`.
 - Meal calls are informational: Chitti speaks the full message and ends the call without showing answer buttons.

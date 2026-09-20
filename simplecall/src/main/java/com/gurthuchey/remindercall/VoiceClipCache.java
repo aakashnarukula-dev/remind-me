@@ -35,13 +35,33 @@ final class VoiceClipCache {
             String code = AppLanguage.normalize(language);
             File file = new File(new File(context.getFilesDir(), DIRECTORY),
                     id(text, code) + ".mp3");
-            if ("te".equals(code) && BUNDLED_MEDICINE_PROMPT_TEXT.equals(text)) {
+            int bundledDelay = bundledDelayResource(context, text, code);
+            if (bundledDelay != 0) {
+                installBundledClip(context, file, bundledDelay);
+            } else if ("te".equals(code) && BUNDLED_MEDICINE_PROMPT_TEXT.equals(text)) {
                 installBundledClip(context, file, R.raw.medicine_not_taken);
             } else if ("te".equals(code) && BUNDLED_FIVE_MINUTE_RESPONSE_TEXT.equals(text)) {
                 installBundledClip(context, file, R.raw.reminder_delayed_5);
             }
             return valid(file) ? file : null;
         }
+    }
+
+    private static int bundledDelayResource(Context context, String text, String language) {
+        String suffix = null;
+        if (SpeechText.reminderDelayQuestion(language).equals(text)) {
+            suffix = "question";
+        } else {
+            for (int minutes : CallService.DELAY_MINUTES) {
+                if (SpeechText.reminderDelayed(minutes, language).equals(text)) {
+                    suffix = Integer.toString(minutes);
+                    break;
+                }
+            }
+        }
+        if (suffix == null) return 0;
+        return context.getResources().getIdentifier(
+                "remind_later_" + language + "_" + suffix, "raw", context.getPackageName());
     }
 
     static boolean prepareBlocking(Context context, DocumentReference member,
@@ -192,6 +212,10 @@ final class VoiceClipCache {
                     add(values, SpeechText.mealQuestion(config.memberName, schedule.label,
                             schedule.hour < 12, schedule.preMinutes, language), language);
                 }
+            }
+            add(values, SpeechText.reminderDelayQuestion(language), language);
+            for (int minutes : CallService.DELAY_MINUTES) {
+                add(values, SpeechText.reminderDelayed(minutes, language), language);
             }
             if (schedule.confirmationMinutes > 0) {
                 add(values, SpeechText.confirmationQuestion(config.memberName, schedule.label,

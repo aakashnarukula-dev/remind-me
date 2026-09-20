@@ -6,7 +6,8 @@
     "node": "22"
   },
   "scripts": {
-    "check": "node --check index.js interpretation.js && node --test voice.test.js interpretation.test.js"
+    "check": "node --check index.js interpretation.js generate_remind_later_assets.js && node --test voice.test.js interpretation.test.js",
+    "generate:remind-later-audio": "node generate_remind_later_assets.js"
   },
   "dependencies": {
     "@google-cloud/speech": "^8.0.1",

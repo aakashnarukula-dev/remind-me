@@ -296,6 +296,8 @@ function voiceEntries(member) {
         }
       }
     }
+    add(reminderDelayQuestion(lang), lang);
+    for (const minutes of [5, 15, 30, 60]) add(reminderDelayed(minutes, lang), lang);
     if (Number(schedule.confirmationMinutes) > 0) {
       add(confirmationQuestion(name, schedule.label, category, lang), lang);
       add(medicineTaken(name, lang), lang);
