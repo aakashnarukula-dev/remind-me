@@ -145,13 +145,14 @@ public final class CallActivity extends android.app.Activity {
 
     private void renderIncoming() {
         String language = callLanguage();
+        String reminderTitle = reminderTitle(language);
         LinearLayout page = basePage();
         page.setPadding(Ui.dp(this, 22), Ui.dp(this, 18),
                 Ui.dp(this, 22), Ui.dp(this, 24));
         Ui.safeArea(page, true, true, true, true);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        TextView status = centered("●  " + AppLanguage.ui(language, "Reminder call"),
+        TextView status = centered("●  " + reminderTitle,
                 14, Ui.GARDEN_INK, true);
         status.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         status.setBackground(Ui.glass(this, 22));
@@ -165,7 +166,7 @@ public final class CallActivity extends android.app.Activity {
         TextView caller = centered(AppLanguage.caller(language), 34, Ui.GARDEN_INK, true);
         caller.setPadding(Ui.dp(this, 12), Ui.dp(this, 30), Ui.dp(this, 12), 0);
         page.addView(caller, Ui.matchWrap());
-        TextView incoming = centered(AppLanguage.ui(language, "Reminder call"), 17,
+        TextView incoming = centered(reminderTitle, 17,
                 Ui.GARDEN_MUTED, false);
         incoming.setPadding(0, Ui.dp(this, 7), 0, 0);
         page.addView(incoming, Ui.matchWrap());
@@ -188,6 +189,11 @@ public final class CallActivity extends android.app.Activity {
         page.addView(actions, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         setContentView(page);
+    }
+
+    private String reminderTitle(String language) {
+        return CallService.session(this).getString("reminderTitle",
+                AppLanguage.ui(language, "Reminder call"));
     }
 
     private void renderOngoing(int step, int branch) {

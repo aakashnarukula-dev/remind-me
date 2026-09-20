@@ -559,7 +559,7 @@ public final class CallService extends Service {
     }
 
     private Notification incomingNotification() {
-        String incoming = AppLanguage.ui(language, "Reminder call");
+        String incoming = reminderTitle();
         Notification.Builder builder = baseBuilder(callerName(), incoming)
                 .setContentIntent(activityPending())
                 .setFullScreenIntent(activityPending(), true)
@@ -828,6 +828,7 @@ public final class CallService extends Service {
                 .putString("language", language)
                 .putString("callerName", callerName())
                 .putString("member", member)
+                .putString("reminderTitle", reminderTitle())
                 .putString("question", question())
                 .putString("answerA", answerA())
                 .putString("answerB", answerB())
@@ -836,6 +837,10 @@ public final class CallService extends Service {
                 .putBoolean("customCall", customCall())
                 .putBoolean("showDelayOptions", !customCall() && step == 2)
                 .apply();
+    }
+
+    private String reminderTitle() {
+        return safe(label, AppLanguage.ui(language, "Reminder call"));
     }
 
     private String question() {
