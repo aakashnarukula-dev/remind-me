@@ -83,6 +83,7 @@ public final class CallService extends Service {
     private boolean answered;
     private boolean finalizing;
     private boolean transitioning;
+    private boolean selectingDelay;
     private boolean callScreenVisible;
     private long connectedAtMillis;
     private int step;
@@ -210,6 +211,7 @@ public final class CallService extends Service {
         speakerOn = false;
         finalizing = false;
         transitioning = false;
+        selectingDelay = false;
         connectedAtMillis = 0L;
         step = 0;
         branch = 0;
@@ -265,11 +267,21 @@ public final class CallService extends Service {
     }
 
     private void choose(int option, int expectedStep) {
-        int maximumOption = customCall() ? customAnswerCount() - 1
+        int maximumOption = selectingDelay ? DELAY_MINUTES.length - 1
+                : customCall() ? customAnswerCount()
                 : step == 2 ? DELAY_MINUTES.length - 1 : confirmationCall() ? 2 : 1;
         if (!active || !answered || expectedStep != step
                 || transitioning || option < 0 || option > maximumOption) return;
         handler.removeCallbacks(unansweredQuestion);
+        if (selectingDelay) {
+            int delay = DELAY_MINUTES[option];
+            if (!"test-call".equals(scheduleId)) {
+                ReminderScheduler.scheduleRetryAfter(this, scheduleId, phase,
+                        label, member, preMinutes, delay);
+            }
+            finishWithResponse(SpeechText.reminderDelayed(delay, language));
+            return;
+        }
         if (confirmationCall()) {
             if (step == 0 && option == 0) {
                 finishWithResponse(SpeechText.medicineTaken(member, language));
@@ -292,6 +304,10 @@ public final class CallService extends Service {
             return;
         }
         if (customCall()) {
+            if (option == customAnswerCount()) {
+                announceDelayQuestion();
+                return;
+            }
             RemoteStore.ScriptAnswer selected = activeSchedule.questions.get(step).answers.get(option);
             String response = SpeechText.custom(selected.response, member, label,
                     activeSchedule.category, language);
@@ -338,6 +354,18 @@ public final class CallService extends Service {
         }
     }
 
+    private void announceDelayQuestion() {
+        if (!active || !answered || finalizing) return;
+        selectingDelay = true;
+        transitioning = false;
+        handler.removeCallbacks(unansweredQuestion);
+        writeSession();
+        showOngoingNotification(question());
+        broadcastState();
+        handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS + 30_000L);
+        speak(question(), "delay_question");
+    }
+
     private void reject(boolean missed) {
         if (!active) return;
         if (!"test-call".equals(scheduleId)) {
@@ -364,6 +392,7 @@ public final class CallService extends Service {
         connectedAtMillis = 0L;
         activeSchedule = null;
         transitioning = false;
+        selectingDelay = false;
         handler.removeCallbacksAndMessages(null);
         stopRingAudio();
         cancelSpeechPlayback();
@@ -475,6 +504,7 @@ public final class CallService extends Service {
                 .putString("question", response).putString("answerA", "")
                 .putString("answerB", "").putString("answerC", "")
                 .putString("answerD", "").putBoolean("showDelayOptions", false)
+                .putBoolean("showRemindLater", false)
                 .putBoolean("finalizing", true).putBoolean("transitioning", false).apply();
         showOngoingNotification(response);
         broadcastState();
@@ -488,6 +518,7 @@ public final class CallService extends Service {
                 .putString("question", response).putString("answerA", "")
                 .putString("answerB", "").putString("answerC", "")
                 .putString("answerD", "").putBoolean("showDelayOptions", false)
+                .putBoolean("showRemindLater", false)
                 .putBoolean("transitioning", true).apply();
         showOngoingNotification(response);
         broadcastState();
@@ -509,19 +540,13 @@ public final class CallService extends Service {
         } else if (id != null && id.startsWith("question_")
                 && active && answered && !finalizing) {
             handler.removeCallbacks(unansweredQuestion);
-            if (customCall() && customAnswerCount() == 0) {
-                int nextStep = step + 1;
-                if (nextStep >= activeSchedule.questions.size()) {
-                    scheduleConfirmationAfterPrimary();
-                    finishCall();
-                } else {
-                    announceQuestion(nextStep);
-                }
-            } else {
-                // Give the person a full minute after Chitti finishes asking the question.
-                // A partial conversation therefore cannot time out while the prompt is playing.
-                handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS);
-            }
+            // Give the person a full minute after Chitti finishes asking the question.
+            // Every authored question also has the built-in Remind me later action.
+            handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS);
+        } else if ("delay_question".equals(id)
+                && active && answered && !finalizing && selectingDelay) {
+            handler.removeCallbacks(unansweredQuestion);
+            handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS);
         }
     }
 
@@ -835,7 +860,10 @@ public final class CallService extends Service {
                 .putString("answerC", answerC())
                 .putString("answerD", answerD())
                 .putBoolean("customCall", customCall())
-                .putBoolean("showDelayOptions", !customCall() && step == 2)
+                .putInt("customAnswerCount", customAnswerCount())
+                .putBoolean("showRemindLater", customCall() && !selectingDelay)
+                .putString("remindLaterLabel", SpeechText.answerLater(language))
+                .putBoolean("showDelayOptions", selectingDelay || (!customCall() && step == 2))
                 .apply();
     }
 
@@ -844,6 +872,7 @@ public final class CallService extends Service {
     }
 
     private String question() {
+        if (selectingDelay) return SpeechText.reminderDelayQuestion(language);
         if (confirmationCall()) {
             if (step == 2) return SpeechText.reminderDelayQuestion(language);
             return SpeechText.confirmationQuestion(member, label,

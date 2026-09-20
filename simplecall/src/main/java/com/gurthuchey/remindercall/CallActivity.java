@@ -225,10 +225,15 @@ public final class CallActivity extends android.app.Activity {
         String answerB = session.getString("answerB", "No");
         String answerC = session.getString("answerC", "");
         String answerD = session.getString("answerD", "");
+        String remindLaterLabel = session.getString("remindLaterLabel",
+                SpeechText.answerLater(language));
+        boolean showRemindLater = session.getBoolean("showRemindLater", false);
+        int customAnswerCount = session.getInt("customAnswerCount", 0);
         boolean customCall = session.getBoolean("customCall", false);
         TextView question = Ui.text(this, "", 25, Ui.GARDEN_INK, true);
         question.setText(highlightButtonLabels(questionText, customCall,
-                answerA, answerB, answerC, answerD));
+                answerA, answerB, answerC, answerD,
+                showRemindLater ? remindLaterLabel : ""));
         question.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         question.setLineSpacing(0, 1.18f);
         interactionSheet.addView(question, Ui.matchWrap());
@@ -244,6 +249,10 @@ public final class CallActivity extends android.app.Activity {
                     interactionSheet.addView(option(answers[index], index, step, customCall),
                             optionParams());
                 }
+            }
+            if (showRemindLater) {
+                interactionSheet.addView(remindLaterOption(remindLaterLabel,
+                        customAnswerCount, step), optionParams());
             }
         }
         page.addView(interactionSheet, new LinearLayout.LayoutParams(
@@ -423,6 +432,15 @@ public final class CallActivity extends android.app.Activity {
         option.setBackground(Ui.actionBackground(this,
                 customCall ? Ui.PRIMARY : index == 0 ? Ui.ACCEPT : Ui.REJECT, 22));
         option.setElevation(Ui.dp(this, 3));
+        option.setOnClickListener(v -> submitOption(v, index, expectedStep));
+        return option;
+    }
+
+    private TextView remindLaterOption(String label, int index, int expectedStep) {
+        TextView option = centered(label, 18, Ui.GARDEN_INK, true);
+        option.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
+        option.setBackground(Ui.actionBackground(this, Ui.ACCEPT_LIGHT, 22));
+        option.setElevation(Ui.dp(this, 2));
         option.setOnClickListener(v -> submitOption(v, index, expectedStep));
         return option;
     }

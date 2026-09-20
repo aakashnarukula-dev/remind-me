@@ -58,7 +58,8 @@ test("keeps each reminder on its own language and voice", () => {
           answers: [{label: "Okay", response: "Okay. Bye!"}]}]},
     ],
   });
-  assert.deepEqual(entries.map((entry) => entry.language), ["te", "te", "en", "en"]);
+  assert.equal(entries.filter((entry) => entry.language === "te").length, 7);
+  assert.equal(entries.filter((entry) => entry.language === "en").length, 7);
   assert.notEqual(voice.clipId(entries[0].text, "te"), voice.clipId(entries[0].text, "en"));
 });
 
@@ -125,6 +126,11 @@ test("generates every custom reminder question and answer response", () => {
     "హలో అమ్మా! డాక్టర్ అపాయింట్మెంట్ గుర్తుందా?",
     "సరే అమ్మా. Bye!",
     "డాక్టర్ అపాయింట్మెంట్ క్యాలెండర్‌లో చూడండి.",
+    voice.reminderDelayQuestion(),
+    voice.reminderDelayed(5),
+    voice.reminderDelayed(15),
+    voice.reminderDelayed(30),
+    voice.reminderDelayed(60),
   ]);
   assert.equal(texts.some((text) => text.includes("టాబ్లెట్")), false);
 });
@@ -174,7 +180,14 @@ test("unknown future categories stay generic instead of becoming medicine", () =
       questions: [{prompt: "[Reminder] గుర్తుందా?", answers: []}],
     }],
   });
-  assert.deepEqual(texts, ["పుట్టినరోజు గుర్తుందా?"]);
+  assert.deepEqual(texts, [
+    "పుట్టినరోజు గుర్తుందా?",
+    voice.reminderDelayQuestion(),
+    voice.reminderDelayed(5),
+    voice.reminderDelayed(15),
+    voice.reminderDelayed(30),
+    voice.reminderDelayed(60),
+  ]);
   assert.equal(texts.some((text) => text.includes("టాబ్లెట్")), false);
 });
 
@@ -194,6 +207,11 @@ test("legacy generic kind stays generic instead of becoming medicine", () => {
   assert.deepEqual(texts, [
     "హలో అమ్మా! డాక్టర్ అపాయింట్మెంట్ గుర్తుందా?",
     "సరే. Bye!",
+    voice.reminderDelayQuestion(),
+    voice.reminderDelayed(5),
+    voice.reminderDelayed(15),
+    voice.reminderDelayed(30),
+    voice.reminderDelayed(60),
   ]);
 });
 
@@ -225,7 +243,7 @@ test("limits one member to the same fifty reminders accepted by Android", () => 
     }],
   }));
   const texts = voice.voiceTexts({ name: "అమ్మా", schedules });
-  assert.equal(texts.length, 50);
+  assert.equal(texts.length, 55);
   assert.equal(texts.at(-1), "Task 49 49");
 });
 

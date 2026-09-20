@@ -1665,7 +1665,9 @@ public final class MainActivity extends FragmentActivity {
 
     private void updateConversationSummary(TextView view, Models.Schedule schedule) {
         int answers = 0;
-        for (Models.ScriptQuestion question : schedule.questions) answers += question.answers.size();
+        for (Models.ScriptQuestion question : schedule.questions) {
+            answers += question.answers.size() + 1;
+        }
         view.setText(schedule.questions.isEmpty()
                 ? "Add call conversation  ›"
                 : schedule.questions.size() + (schedule.questions.size() == 1
@@ -1759,8 +1761,27 @@ public final class MainActivity extends FragmentActivity {
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 0, 8, 0));
                 }
+                TextView later = Ui.text(this,
+                        AppLanguage.ui(schedule.language, "Remind me later"),
+                        12, Ui.OK, true);
+                later.setGravity(Gravity.CENTER);
+                later.setPadding(Ui.dp(this, 12), Ui.dp(this, 6),
+                        Ui.dp(this, 12), Ui.dp(this, 6));
+                later.setBackground(Ui.strokedShape(Ui.MINT, 18, Ui.OK, 1, this));
+                answerRow.addView(later, Ui.margins(ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 0, 8, 0));
                 answerScroll.addView(answerRow);
                 card.addView(answerScroll, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 10, 0, 0));
+            } else {
+                TextView later = Ui.text(this,
+                        AppLanguage.ui(schedule.language, "Remind me later"),
+                        12, Ui.OK, true);
+                later.setGravity(Gravity.CENTER);
+                later.setPadding(Ui.dp(this, 12), Ui.dp(this, 6),
+                        Ui.dp(this, 12), Ui.dp(this, 6));
+                later.setBackground(Ui.strokedShape(Ui.MINT, 18, Ui.OK, 1, this));
+                card.addView(later, Ui.margins(ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 10, 0, 0));
             }
             card.setOnClickListener(v -> showQuestionEditor(schedule, question, () -> {

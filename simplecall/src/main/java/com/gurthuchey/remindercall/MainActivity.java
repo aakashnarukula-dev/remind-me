@@ -1225,7 +1225,7 @@ public final class MainActivity extends FragmentActivity {
     private void updateConversationSummary(TextView view, RemoteStore.Schedule schedule) {
         int answers = 0;
         for (RemoteStore.ScriptQuestion question : schedule.questions) {
-            answers += question.answers.size();
+            answers += question.answers.size() + 1;
         }
         view.setText(schedule.questions.isEmpty()
                 ? "Add call conversation  ›"
@@ -1323,8 +1323,29 @@ public final class MainActivity extends FragmentActivity {
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 8, 0));
                 }
+                TextView later = Ui.text(this,
+                        AppLanguage.ui(schedule.language, "Remind me later"),
+                        12, Ui.ACCEPT, true);
+                later.setGravity(Gravity.CENTER);
+                later.setPadding(Ui.dp(this, 12), Ui.dp(this, 6),
+                        Ui.dp(this, 12), Ui.dp(this, 6));
+                later.setBackground(Ui.roundedWithStroke(Ui.ACCEPT_LIGHT, 18,
+                        Ui.ACCEPT, 1, this));
+                answerRow.addView(later, sizedMargins(ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 8, 0));
                 answerScroll.addView(answerRow);
                 card.addView(answerScroll, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10, 0, 0));
+            } else {
+                TextView later = Ui.text(this,
+                        AppLanguage.ui(schedule.language, "Remind me later"),
+                        12, Ui.ACCEPT, true);
+                later.setGravity(Gravity.CENTER);
+                later.setPadding(Ui.dp(this, 12), Ui.dp(this, 6),
+                        Ui.dp(this, 12), Ui.dp(this, 6));
+                later.setBackground(Ui.roundedWithStroke(Ui.ACCEPT_LIGHT, 18,
+                        Ui.ACCEPT, 1, this));
+                card.addView(later, sizedMargins(ViewGroup.LayoutParams.WRAP_CONTENT,
                         ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10, 0, 0));
             }
             card.setContentDescription("Edit question " + (index + 1));
