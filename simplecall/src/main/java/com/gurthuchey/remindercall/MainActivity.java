@@ -1305,9 +1305,28 @@ public final class MainActivity extends FragmentActivity {
             prompt.setMaxLines(3);
             card.addView(prompt, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT, 0, 5, 0, 0));
-            card.addView(Ui.text(this, question.answers.size()
-                            + (question.answers.size() == 1 ? " answer" : " answers"),
-                    12, Ui.MUTED, false));
+            if (!question.answers.isEmpty()) {
+                HorizontalScrollView answerScroll = new HorizontalScrollView(this);
+                answerScroll.setHorizontalScrollBarEnabled(false);
+                answerScroll.setClipToPadding(false);
+                LinearLayout answerRow = new LinearLayout(this);
+                answerRow.setOrientation(LinearLayout.HORIZONTAL);
+                answerRow.setGravity(Gravity.CENTER_VERTICAL);
+                for (RemoteStore.ScriptAnswer answer : question.answers) {
+                    TextView pill = Ui.text(this, answer.label, 12, Ui.ACCEPT, true);
+                    pill.setGravity(Gravity.CENTER);
+                    pill.setPadding(Ui.dp(this, 12), Ui.dp(this, 6),
+                            Ui.dp(this, 12), Ui.dp(this, 6));
+                    pill.setBackground(Ui.roundedWithStroke(Ui.ACCEPT_LIGHT, 18,
+                            Ui.ACCEPT, 1, this));
+                    answerRow.addView(pill, sizedMargins(
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 8, 0));
+                }
+                answerScroll.addView(answerRow);
+                card.addView(answerScroll, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10, 0, 0));
+            }
             card.setContentDescription("Edit question " + (index + 1));
             card.setOnClickListener(v -> showQuestionEditor(schedule, question, () -> {
                 renderQuestionList(list, schedule, changed);
