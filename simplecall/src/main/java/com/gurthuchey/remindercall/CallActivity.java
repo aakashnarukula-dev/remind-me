@@ -228,7 +228,6 @@ public final class CallActivity extends android.app.Activity {
         String remindLaterLabel = session.getString("remindLaterLabel",
                 SpeechText.answerLater(language));
         boolean showRemindLater = session.getBoolean("showRemindLater", false);
-        int customAnswerCount = session.getInt("customAnswerCount", 0);
         boolean customCall = session.getBoolean("customCall", false);
         TextView question = Ui.text(this, "", 25, Ui.GARDEN_INK, true);
         question.setText(highlightButtonLabels(questionText, customCall,
@@ -241,7 +240,7 @@ public final class CallActivity extends android.app.Activity {
 
         if (session.getBoolean("showDelayOptions", false)
                 && !session.getBoolean("finalizing", false)) {
-            interactionSheet.addView(delayOptions(step), optionParams());
+            interactionSheet.addView(delayOptions(step, false), optionParams());
         } else {
             String[] answers = {answerA, answerB, answerC, answerD};
             for (int index = 0; index < answers.length; index++) {
@@ -251,8 +250,7 @@ public final class CallActivity extends android.app.Activity {
                 }
             }
             if (showRemindLater) {
-                interactionSheet.addView(remindLaterOption(remindLaterLabel,
-                        customAnswerCount, step), optionParams());
+                interactionSheet.addView(remindLaterOptions(remindLaterLabel, step));
             }
         }
         page.addView(interactionSheet, new LinearLayout.LayoutParams(
@@ -436,13 +434,19 @@ public final class CallActivity extends android.app.Activity {
         return option;
     }
 
-    private TextView remindLaterOption(String label, int index, int expectedStep) {
-        TextView option = centered(label, 18, Ui.GARDEN_INK, true);
-        option.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
-        option.setBackground(Ui.actionBackground(this, Ui.ACCEPT_LIGHT, 22));
-        option.setElevation(Ui.dp(this, 2));
-        option.setOnClickListener(v -> submitOption(v, index, expectedStep));
-        return option;
+    private LinearLayout remindLaterOptions(String label, int expectedStep) {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+        TextView title = Ui.text(this, label, 15, Ui.GARDEN_MUTED, true);
+        title.setPadding(Ui.dp(this, 2), 0, 0, Ui.dp(this, 10));
+        group.addView(title, Ui.matchWrap());
+        group.addView(delayOptions(expectedStep, true), new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 58)));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = Ui.dp(this, 14);
+        group.setLayoutParams(params);
+        return group;
     }
 
     private LinearLayout.LayoutParams optionParams() {
@@ -452,7 +456,7 @@ public final class CallActivity extends android.app.Activity {
         return params;
     }
 
-    private LinearLayout delayOptions(int expectedStep) {
+    private LinearLayout delayOptions(int expectedStep, boolean directDelay) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         String[] labels = new String[CallService.DELAY_MINUTES.length];
@@ -463,7 +467,8 @@ public final class CallActivity extends android.app.Activity {
             TextView button = centered(labels[index], 12, Ui.GARDEN_INK, true);
             button.setBackground(Ui.actionBackground(this, Ui.ACCEPT_LIGHT, 18));
             final int optionIndex = index;
-            button.setOnClickListener(v -> selectDelayOption(button, optionIndex, expectedStep));
+            button.setOnClickListener(v -> selectDelayOption(
+                    button, optionIndex, expectedStep, directDelay));
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                     0, LinearLayout.LayoutParams.MATCH_PARENT, 1f);
             if (index < labels.length - 1) params.setMarginEnd(Ui.dp(this, 7));
@@ -472,13 +477,17 @@ public final class CallActivity extends android.app.Activity {
         return row;
     }
 
-    private void selectDelayOption(TextView button, int option, int expectedStep) {
+    private void selectDelayOption(TextView button, int option, int expectedStep,
+            boolean directDelay) {
         if (optionSubmitting) return;
         optionSubmitting = true;
         button.setTextColor(Color.WHITE);
         button.setBackground(Ui.actionBackground(this, Ui.ACCEPT, 18));
         button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
-        button.postDelayed(() -> dispatchOption(option, expectedStep), 140L);
+        button.postDelayed(() -> {
+            if (directDelay) dispatchDelay(option, expectedStep);
+            else dispatchOption(option, expectedStep);
+        }, 140L);
     }
 
     private void submitOption(View view, int option, int expectedStep) {
@@ -490,6 +499,13 @@ public final class CallActivity extends android.app.Activity {
 
     private void dispatchOption(int option, int expectedStep) {
         Intent intent = new Intent(this, CallService.class).setAction(CallService.ACTION_OPTION)
+                .putExtra(CallService.EXTRA_OPTION, option)
+                .putExtra(CallService.EXTRA_OPTION_STEP, expectedStep);
+        startService(intent);
+    }
+
+    private void dispatchDelay(int option, int expectedStep) {
+        Intent intent = new Intent(this, CallService.class).setAction(CallService.ACTION_DELAY)
                 .putExtra(CallService.EXTRA_OPTION, option)
                 .putExtra(CallService.EXTRA_OPTION_STEP, expectedStep);
         startService(intent);

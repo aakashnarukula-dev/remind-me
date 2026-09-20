@@ -1379,8 +1379,10 @@ public final class MainActivity extends FragmentActivity {
         sheet.setPadding(Ui.dp(this, 18), Ui.dp(this, 8),
                 Ui.dp(this, 18), Ui.dp(this, 14));
         sheet.setBackground(Ui.topRounded(Ui.WHITE, 28, this));
-        sheet.setClipChildren(false);
-        sheet.setClipToPadding(false);
+        sheet.setClipChildren(true);
+        sheet.setClipToPadding(true);
+        sheet.setFocusableInTouchMode(true);
+        sheet.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
         Ui.safeArea(sheet, true, false, true, true);
         sheet.addView(draggableSheetHandle(dialog, sheet), Ui.margins(
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 24), this, 0, 0, 0, 2));
@@ -1448,6 +1450,10 @@ public final class MainActivity extends FragmentActivity {
                     Ui.dp(this, 72), 0, 5, 0, 0));
         }
         ScrollView scroll = new ScrollView(this);
+        scroll.setClipChildren(true);
+        scroll.setClipToPadding(true);
+        scroll.setFillViewport(true);
+        scroll.setOverScrollMode(View.OVER_SCROLL_NEVER);
         scroll.addView(form);
         sheet.addView(scroll, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
@@ -1493,6 +1499,12 @@ public final class MainActivity extends FragmentActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 52)));
         dialog.setContentView(sheet);
         showSheet(dialog, 0.84f);
+        sheet.postDelayed(() -> {
+            sheet.setDescendantFocusability(ViewGroup.FOCUS_BEFORE_DESCENDANTS);
+            prompt.clearFocus();
+            sheet.requestFocus();
+            scroll.scrollTo(0, 0);
+        }, 360L);
     }
 
     private EditText scriptInput(String hint, boolean singleLine, int maximum) {
@@ -1529,7 +1541,8 @@ public final class MainActivity extends FragmentActivity {
             window.setGravity(Gravity.BOTTOM);
             window.setDimAmount(0.48f);
             window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN
+                    | WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
             window.setNavigationBarColor(Ui.BG);
             applyLightSystemBars(window);
             window.setWindowAnimations(R.style.BottomSheetAnimation);
