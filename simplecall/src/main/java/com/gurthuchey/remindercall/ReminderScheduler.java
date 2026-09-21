@@ -234,6 +234,33 @@ final class ReminderScheduler {
                 .remove(retryKey(id, phase)).commit();
     }
 
+    /** Cancels every remaining occurrence today, then restores the normal recurring schedule. */
+    static void skipRemainingToday(Context context, String id) {
+        if (id == null || id.trim().isEmpty() || "test-call".equals(id)) return;
+        cancelRetry(context, id, PHASE_MEDICINE);
+        cancelRetry(context, id, PHASE_MEAL);
+        cancelRetry(context, id, PHASE_CONFIRMATION);
+
+        AlarmManager alarms = context.getSystemService(AlarmManager.class);
+        alarms.cancel(alarmIntent(context, id, PHASE_MEDICINE, true));
+        alarms.cancel(alarmIntent(context, id, PHASE_MEAL, true));
+
+        RemoteStore.Config config = new RemoteStore(context).load();
+        RemoteStore.Schedule schedule = active(config, id, PHASE_MEDICINE);
+        if (schedule == null) return;
+        Calendar tomorrow = Calendar.getInstance();
+        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
+        tomorrow.set(Calendar.HOUR_OF_DAY, 0);
+        tomorrow.set(Calendar.MINUTE, 0);
+        tomorrow.set(Calendar.SECOND, 0);
+        tomorrow.set(Calendar.MILLISECOND, 0);
+        long after = tomorrow.getTimeInMillis();
+        schedulePhase(context, schedule, PHASE_MEDICINE, after);
+        if (!schedule.custom() && schedule.preMinutes > 0) {
+            schedulePhase(context, schedule, PHASE_MEAL, after);
+        }
+    }
+
     /** Restores unanswered-call retries after a reboot or app update. */
     static void restoreRetries(Context context) {
         SharedPreferences preferences = context.getSharedPreferences(RETRIES, Context.MODE_PRIVATE);

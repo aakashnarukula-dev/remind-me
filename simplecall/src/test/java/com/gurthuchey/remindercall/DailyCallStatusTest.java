@@ -83,4 +83,13 @@ public final class DailyCallStatusTest {
         assertEquals("ಇಂದು ಇಲ್ಲ", DailyCallStatus.notTodayLabel("kn"));
         assertEquals("ഇന്ന് ഇല്ല", DailyCallStatus.notTodayLabel("ml"));
     }
+
+    @Test public void skippedReminderUsesTheNotCompletedCardState() {
+        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applySkippedToday(
+                DailyCallStatus.UPCOMING, true));
+        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applySkippedToday(
+                DailyCallStatus.COMPLETED, true));
+        assertEquals(DailyCallStatus.COMPLETED, DailyCallStatus.applySkippedToday(
+                DailyCallStatus.COMPLETED, false));
+    }
 }

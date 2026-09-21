@@ -27,6 +27,7 @@ final class DailyCallStatus {
     private static final String STATE_RETRY = "retry";
     private static final String STATE_COMPLETED = "completed";
     private static final String STATE_INCOMPLETE = "incomplete";
+    private static final String STATE_SKIPPED = "skipped_today";
     private static final long DUE_GRACE_MS = 90_000L;
     private static final long STALE_RING_MS = 2L * 60_000L;
 
@@ -84,6 +85,16 @@ final class DailyCallStatus {
                 STATE_INCOMPLETE, 0L, System.currentTimeMillis());
     }
 
+    void markSkippedToday(String scheduleId) {
+        write(scheduleId, ReminderScheduler.PHASE_MEDICINE,
+                STATE_SKIPPED, 0L, System.currentTimeMillis());
+    }
+
+    boolean isSkippedToday(String scheduleId, long now) {
+        if (scheduleId == null || scheduleId.trim().isEmpty()) return false;
+        return isSkipped(read(scheduleId, ReminderScheduler.PHASE_MEDICINE, now));
+    }
+
     void clearSchedule(String scheduleId) {
         if (scheduleId == null || scheduleId.trim().isEmpty()
                 || "test-call".equals(scheduleId)) return;
@@ -113,6 +124,7 @@ final class DailyCallStatus {
                 primaryDone, schedule.confirmationMinutes > 0, confirmationDone, now);
         kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
         kind = applyManualIncomplete(kind, isIncomplete(primary));
+        kind = applySkippedToday(kind, isSkipped(primary));
         return new Display(kind, retryAt);
     }
 
@@ -147,6 +159,10 @@ final class DailyCallStatus {
     static String applyManualIncomplete(String kind, boolean manuallyIncomplete) {
         if (!manuallyIncomplete || CALLING.equals(kind) || RETRY.equals(kind)) return kind;
         return MISSED;
+    }
+
+    static String applySkippedToday(String kind, boolean skippedToday) {
+        return applyManualIncomplete(kind, skippedToday);
     }
 
     static String incompleteLabel(String language) {
@@ -215,6 +231,10 @@ final class DailyCallStatus {
 
     private static boolean isIncomplete(Entry entry) {
         return entry != null && STATE_INCOMPLETE.equals(entry.state);
+    }
+
+    private static boolean isSkipped(Entry entry) {
+        return entry != null && STATE_SKIPPED.equals(entry.state);
     }
 
     private static long earliestRetry(Entry... entries) {

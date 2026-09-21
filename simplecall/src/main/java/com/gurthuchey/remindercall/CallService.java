@@ -38,6 +38,7 @@ public final class CallService extends Service {
     static final String ACTION_OPTION = "com.gurthuchey.remindercall.OPTION";
     static final String ACTION_DELAY = "com.gurthuchey.remindercall.DELAY";
     static final String ACTION_DELAY_AT = "com.gurthuchey.remindercall.DELAY_AT";
+    static final String ACTION_SKIP_TODAY = "com.gurthuchey.remindercall.SKIP_TODAY";
     static final String ACTION_END = "com.gurthuchey.remindercall.END";
     static final String ACTION_SILENCE = "com.gurthuchey.remindercall.SILENCE";
     static final String ACTION_RESTORE_NOTIFICATION =
@@ -169,6 +170,7 @@ public final class CallService extends Service {
         else if (ACTION_DELAY_AT.equals(action)) chooseDelayAt(
                 intent.getLongExtra(EXTRA_DELAY_AT, -1L),
                 intent.getIntExtra(EXTRA_OPTION_STEP, -1));
+        else if (ACTION_SKIP_TODAY.equals(action)) skipToday();
         else if (ACTION_END.equals(action)) reject(false);
         else if (ACTION_SILENCE.equals(action)) silenceRinging();
         else if (ACTION_RESTORE_NOTIFICATION.equals(action)) restoreCallNotification();
@@ -202,6 +204,13 @@ public final class CallService extends Service {
         doseHour = intent.getIntExtra("doseHour", -1);
         RemoteStore.Config config = new RemoteStore(this).load();
         activeSchedule = ReminderScheduler.active(config, scheduleId, phase);
+        if (!"test-call".equals(scheduleId)
+                && new DailyCallStatus(this).isSkippedToday(scheduleId,
+                        System.currentTimeMillis())) {
+            ReminderScheduler.skipRemainingToday(this, scheduleId);
+            stopSelf();
+            return;
+        }
         language = activeSchedule == null
                 ? (config == null ? AppLanguage.current(this) : AppLanguage.normalize(config.language))
                 : AppLanguage.normalize(activeSchedule.language);
@@ -412,6 +421,16 @@ public final class CallService extends Service {
         if (!"test-call".equals(scheduleId)) {
             ReminderScheduler.scheduleRetry(this, scheduleId, phase,
                     label, member, preMinutes);
+        }
+        finishCall();
+    }
+
+    private void skipToday() {
+        if (!active || !answered || finalizing) return;
+        handler.removeCallbacks(unansweredQuestion);
+        if (!"test-call".equals(scheduleId)) {
+            new DailyCallStatus(this).markSkippedToday(scheduleId);
+            ReminderScheduler.skipRemainingToday(this, scheduleId);
         }
         finishCall();
     }

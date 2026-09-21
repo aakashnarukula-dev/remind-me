@@ -26,6 +26,10 @@ public final class AlarmReceiver extends BroadcastReceiver {
             ReminderScheduler.scheduleAll(context, config,
                     System.currentTimeMillis() + 60_000L);
         }
+        if (new DailyCallStatus(context).isSkippedToday(id, System.currentTimeMillis())) {
+            ReminderScheduler.skipRemainingToday(context, id);
+            return;
+        }
         if (CallConflictDetector.isAnotherCallActive(context)) {
             ReminderScheduler.scheduleRetry(context, id, phase, label, member, preMinutes);
             return;
