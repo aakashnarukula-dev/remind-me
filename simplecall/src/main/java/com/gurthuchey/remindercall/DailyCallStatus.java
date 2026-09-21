@@ -18,6 +18,7 @@ final class DailyCallStatus {
     static final String RETRY = "retry";
     static final String COMPLETED = "completed";
     static final String MISSED = "missed";
+    static final String SKIPPED = "skipped";
     static final String NOT_TODAY = "not_today";
     static final String UNKNOWN = "unknown";
 
@@ -162,7 +163,7 @@ final class DailyCallStatus {
     }
 
     static String applySkippedToday(String kind, boolean skippedToday) {
-        return applyManualIncomplete(kind, skippedToday);
+        return skippedToday ? SKIPPED : kind;
     }
 
     static String incompleteLabel(String language) {
@@ -180,6 +181,15 @@ final class DailyCallStatus {
                 : "ml".equals(language) ? 5 : 0;
         String[] values = {"Completed", "పూర్తయింది", "पूरा हुआ",
                 "முடிந்தது", "ಪೂರ್ಣಗೊಂಡಿದೆ", "പൂർത്തിയായി"};
+        return values[index];
+    }
+
+    static String skippedLabel(String language) {
+        int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
+                : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
+                : "ml".equals(language) ? 5 : 0;
+        String[] values = {"Skipped", "దాటవేశారు", "छोड़ा गया",
+                "தவிர்க்கப்பட்டது", "ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", "ഒഴിവാക്കി"};
         return values[index];
     }
 
