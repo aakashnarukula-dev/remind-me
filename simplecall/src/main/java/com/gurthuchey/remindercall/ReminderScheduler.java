@@ -136,6 +136,25 @@ final class ReminderScheduler {
         scheduleRetryAt(context, id, phase, label, member, preMinutes, at);
     }
 
+    static boolean scheduleRetryAtTime(Context context, String id, String phase, String label,
+            String member, int preMinutes, long at) {
+        if (!isLaterToday(System.currentTimeMillis(), at)) return false;
+        saveRetry(context, id, phase, label, member, preMinutes, at);
+        scheduleRetryAt(context, id, phase, label, member, preMinutes, at);
+        return true;
+    }
+
+    static boolean isLaterToday(long now, long at) {
+        if (at <= now) return false;
+        Calendar current = Calendar.getInstance();
+        current.setTimeInMillis(now);
+        Calendar selected = Calendar.getInstance();
+        selected.setTimeInMillis(at);
+        return current.get(Calendar.ERA) == selected.get(Calendar.ERA)
+                && current.get(Calendar.YEAR) == selected.get(Calendar.YEAR)
+                && current.get(Calendar.DAY_OF_YEAR) == selected.get(Calendar.DAY_OF_YEAR);
+    }
+
     static void scheduleConfirmation(Context context, String id) {
         RemoteStore.Config config = new RemoteStore(context).load();
         RemoteStore.Schedule schedule = active(config, id, PHASE_CONFIRMATION);

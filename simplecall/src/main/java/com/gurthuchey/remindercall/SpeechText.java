@@ -130,6 +130,18 @@ final class SpeechText {
         }
     }
 
+    static String reminderDelayedUntil(String time, String language) {
+        String value = clean(time, "the selected time");
+        switch (AppLanguage.normalize(language)) {
+            case "hi": return "ठीक है। मैं आज " + value + " बजे फिर कॉल करके याद दिलाऊँगी। बाय!";
+            case "ta": return "சரி. இன்று " + value + " மணிக்கு மீண்டும் அழைத்து நினைவூட்டுகிறேன். பை!";
+            case "kn": return "ಸರಿ. ಇಂದು " + value + " ಗಂಟೆಗೆ ಮತ್ತೆ ಕರೆ ಮಾಡಿ ನೆನಪಿಸುತ್ತೇನೆ. ಬೈ!";
+            case "ml": return "ശരി. ഇന്ന് " + value + " മണിക്ക് വീണ്ടും വിളിച്ച് ഓർമ്മിപ്പിക്കാം. ബൈ!";
+            case "te": return "సరే. ఈ రోజు " + value + " గంటలకు మళ్లీ కాల్ చేసి గుర్తు చేస్తాను. Bye!";
+            default: return "Okay. I’ll call again at " + value + " today to remind you. Bye!";
+        }
+    }
+
     static String mealQuestion(String member, String medicine, boolean morning, int minutes) {
         return mealQuestion(member, medicine, morning, minutes, "te");
     }

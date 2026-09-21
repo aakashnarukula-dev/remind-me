@@ -4,6 +4,8 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
@@ -18,6 +20,26 @@ public final class ReminderSchedulerTest {
 
     @Test public void rescheduleChoicesContainFiveAndExcludeFortyFiveMinutes() {
         assertArrayEquals(new int[]{5, 15, 30, 60}, CallService.DELAY_MINUTES);
+    }
+
+    @Test public void customRetryTimeMustBeLaterOnTheSameDay() {
+        Calendar now = Calendar.getInstance();
+        now.set(2026, Calendar.SEPTEMBER, 21, 14, 0, 0);
+        now.set(Calendar.MILLISECOND, 0);
+        Calendar later = (Calendar) now.clone();
+        later.set(Calendar.HOUR_OF_DAY, 17);
+        later.set(Calendar.MINUTE, 45);
+        Calendar earlier = (Calendar) now.clone();
+        earlier.set(Calendar.HOUR_OF_DAY, 13);
+        Calendar tomorrow = (Calendar) later.clone();
+        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
+
+        assertTrue(ReminderScheduler.isLaterToday(
+                now.getTimeInMillis(), later.getTimeInMillis()));
+        assertFalse(ReminderScheduler.isLaterToday(
+                now.getTimeInMillis(), earlier.getTimeInMillis()));
+        assertFalse(ReminderScheduler.isLaterToday(
+                now.getTimeInMillis(), tomorrow.getTimeInMillis()));
     }
 
     @Test public void legacyOneMinuteRetryMigratesToFiveMinutesFromUpdate() {
