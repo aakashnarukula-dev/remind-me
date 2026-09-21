@@ -84,12 +84,22 @@ public final class DailyCallStatusTest {
         assertEquals("ഇന്ന് ഇല്ല", DailyCallStatus.notTodayLabel("ml"));
     }
 
-    @Test public void skippedReminderUsesTheNotCompletedCardState() {
-        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applySkippedToday(
+    @Test public void skippedReminderUsesItsOwnCardState() {
+        assertEquals(DailyCallStatus.SKIPPED, DailyCallStatus.applySkippedToday(
                 DailyCallStatus.UPCOMING, true));
-        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applySkippedToday(
+        assertEquals(DailyCallStatus.SKIPPED, DailyCallStatus.applySkippedToday(
                 DailyCallStatus.COMPLETED, true));
         assertEquals(DailyCallStatus.COMPLETED, DailyCallStatus.applySkippedToday(
                 DailyCallStatus.COMPLETED, false));
+        org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.SKIPPED));
+    }
+
+    @Test public void skippedTagSupportsEveryAppLanguage() {
+        assertEquals("Skipped", DailyCallStatus.skippedLabel("en"));
+        assertEquals("దాటవేశారు", DailyCallStatus.skippedLabel("te"));
+        assertEquals("छोड़ा गया", DailyCallStatus.skippedLabel("hi"));
+        assertEquals("தவிர்க்கப்பட்டது", DailyCallStatus.skippedLabel("ta"));
+        assertEquals("ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", DailyCallStatus.skippedLabel("kn"));
+        assertEquals("ഒഴിവാക്കി", DailyCallStatus.skippedLabel("ml"));
     }
 }

@@ -683,6 +683,10 @@ public final class MainActivity extends FragmentActivity {
                 trailing.addView(statusPill(true, schedule), Ui.margins(
                         ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
                         this, 0, 3, 0, 0));
+            } else if (DailyCallStatus.SKIPPED.equals(display.kind)) {
+                trailing.addView(skippedPill(schedule), Ui.margins(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
+                        this, 0, 3, 0, 0));
             } else if (DailyCallStatus.NOT_TODAY.equals(display.kind)) {
                 trailing.addView(notTodayPill(), Ui.margins(
                         ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
@@ -722,6 +726,19 @@ public final class MainActivity extends FragmentActivity {
         pill.setClickable(true);
         pill.setContentDescription("Change today's status for " + schedule.label);
         pill.setOnClickListener(v -> showDailyStatusDialog(schedule, completed));
+        return pill;
+    }
+
+    private View skippedPill(RemoteStore.Schedule schedule) {
+        TextView pill = Ui.text(this, DailyCallStatus.skippedLabel(currentLanguage()),
+                9, Ui.DANGER, true);
+        pill.setGravity(Gravity.CENTER);
+        pill.setSingleLine(true);
+        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.setBackground(Ui.rounded(Color.rgb(253, 235, 237), 11, this));
+        pill.setClickable(true);
+        pill.setContentDescription("Change today's status for " + schedule.label);
+        pill.setOnClickListener(v -> showDailyStatusDialog(schedule, false));
         return pill;
     }
 
