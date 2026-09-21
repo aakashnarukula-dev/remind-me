@@ -676,7 +676,11 @@ public final class MainActivity extends FragmentActivity {
             DailyCallStatus.Display display = dailyCallStatus.display(
                     schedule, System.currentTimeMillis());
             if (DailyCallStatus.isIncomplete(display.kind)) {
-                trailing.addView(incompletePill(), Ui.margins(
+                trailing.addView(statusPill(false), Ui.margins(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
+                        this, 0, 3, 0, 0));
+            } else if (DailyCallStatus.COMPLETED.equals(display.kind)) {
+                trailing.addView(statusPill(true), Ui.margins(
                         ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
                         this, 0, 3, 0, 0));
             }
@@ -701,14 +705,16 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private View incompletePill() {
+    private View statusPill(boolean completed) {
         TextView pill = Ui.text(this,
-                DailyCallStatus.incompleteLabel(currentLanguage()), 9,
-                Color.rgb(139, 98, 25), true);
+                completed ? DailyCallStatus.completedLabel(currentLanguage())
+                        : DailyCallStatus.incompleteLabel(currentLanguage()),
+                9, completed ? Color.rgb(38, 117, 72) : Color.rgb(139, 98, 25), true);
         pill.setGravity(Gravity.CENTER);
         pill.setSingleLine(true);
         pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
-        pill.setBackground(Ui.rounded(Color.rgb(255, 242, 211), 11, this));
+        pill.setBackground(Ui.rounded(completed ? Color.rgb(226, 245, 233)
+                : Color.rgb(255, 242, 211), 11, this));
         return pill;
     }
 
