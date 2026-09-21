@@ -27,6 +27,7 @@ import android.speech.tts.UtteranceProgressListener;
 
 import java.util.Locale;
 import java.util.Calendar;
+import java.util.Date;
 import java.io.File;
 
 public final class CallService extends Service {
@@ -36,6 +37,7 @@ public final class CallService extends Service {
     static final String ACTION_REJECT = "com.gurthuchey.remindercall.REJECT";
     static final String ACTION_OPTION = "com.gurthuchey.remindercall.OPTION";
     static final String ACTION_DELAY = "com.gurthuchey.remindercall.DELAY";
+    static final String ACTION_DELAY_AT = "com.gurthuchey.remindercall.DELAY_AT";
     static final String ACTION_END = "com.gurthuchey.remindercall.END";
     static final String ACTION_SILENCE = "com.gurthuchey.remindercall.SILENCE";
     static final String ACTION_RESTORE_NOTIFICATION =
@@ -49,6 +51,7 @@ public final class CallService extends Service {
     static final String ACTION_STATE_CHANGED = "com.gurthuchey.remindercall.STATE_CHANGED";
     static final String EXTRA_OPTION = "option";
     static final String EXTRA_OPTION_STEP = "optionStep";
+    static final String EXTRA_DELAY_AT = "delayAt";
     static final int[] DELAY_MINUTES = {5, 15, 30, 60};
 
     static final String CHANNEL_ID = "reminder_calls";
@@ -162,6 +165,9 @@ public final class CallService extends Service {
         else if (ACTION_OPTION.equals(action)) choose(intent.getIntExtra(EXTRA_OPTION, -1),
                 intent.getIntExtra(EXTRA_OPTION_STEP, -1));
         else if (ACTION_DELAY.equals(action)) chooseDelay(intent.getIntExtra(EXTRA_OPTION, -1),
+                intent.getIntExtra(EXTRA_OPTION_STEP, -1));
+        else if (ACTION_DELAY_AT.equals(action)) chooseDelayAt(
+                intent.getLongExtra(EXTRA_DELAY_AT, -1L),
                 intent.getIntExtra(EXTRA_OPTION_STEP, -1));
         else if (ACTION_END.equals(action)) reject(false);
         else if (ACTION_SILENCE.equals(action)) silenceRinging();
@@ -373,6 +379,20 @@ public final class CallService extends Service {
                     label, member, preMinutes, delay);
         }
         finishWithResponse(SpeechText.reminderDelayed(delay, language));
+    }
+
+    private void chooseDelayAt(long at, int expectedStep) {
+        boolean delayAvailable = selectingDelay || customCall() || step == 2;
+        if (!active || !answered || finalizing || transitioning || !delayAvailable
+                || expectedStep != step || !ReminderScheduler.isLaterToday(
+                        System.currentTimeMillis(), at)) return;
+        handler.removeCallbacks(unansweredQuestion);
+        if (!"test-call".equals(scheduleId)
+                && !ReminderScheduler.scheduleRetryAtTime(this, scheduleId, phase,
+                        label, member, preMinutes, at)) return;
+        String time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                .format(new Date(at));
+        finishWithResponse(SpeechText.reminderDelayedUntil(time, language));
     }
 
     private void announceDelayQuestion() {

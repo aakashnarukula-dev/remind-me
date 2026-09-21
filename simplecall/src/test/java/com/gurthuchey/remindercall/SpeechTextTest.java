@@ -27,6 +27,8 @@ public final class SpeechTextTest {
                 SpeechText.reminderDelayQuestion());
         assertEquals("సరే. ఐదు నిమిషాల తర్వాత మళ్లీ కాల్ చేసి గుర్తు చేస్తాను. Bye!",
                 SpeechText.reminderDelayed(5));
+        assertEquals("Okay. I’ll call again at 5:45 PM today to remind you. Bye!",
+                SpeechText.reminderDelayedUntil("5:45 PM", "en"));
         assertEquals(SpeechText.reminderDelayed(5),
                 VoiceClipCache.BUNDLED_FIVE_MINUTE_RESPONSE_TEXT);
         assertEquals("హలో Aakash! భోజనం చేశారా? ఇంకా చేయకపోతే ఇప్పుడే చేయండి. "
@@ -76,6 +78,12 @@ public final class SpeechTextTest {
                 SpeechText.medicineQuestion("അമ്മേ", "വിറ്റാമിൻ", "ml"));
         assertEquals("Hello Aakash! తెలుగు reminder",
                 SpeechText.custom("Hello [Name]! తెలుగు [Reminder]", "Aakash", "reminder", "en"));
+        assertEquals("Choose time", AppLanguage.ui("en", "Choose time"));
+        assertEquals("సమయం ఎంచుకోండి", AppLanguage.ui("te", "Choose time"));
+        assertEquals("समय चुनें", AppLanguage.ui("hi", "Choose time"));
+        assertEquals("நேரத்தைத் தேர்வு செய்", AppLanguage.ui("ta", "Choose time"));
+        assertEquals("ಸಮಯ ಆಯ್ಕೆ ಮಾಡಿ", AppLanguage.ui("kn", "Choose time"));
+        assertEquals("സമയം തിരഞ്ഞെടുക്കുക", AppLanguage.ui("ml", "Choose time"));
     }
 
     @Test public void confirmationCallUsesCategoryAppropriateEnglish() {

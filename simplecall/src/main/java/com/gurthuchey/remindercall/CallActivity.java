@@ -1,6 +1,7 @@
 package com.gurthuchey.remindercall;
 
 import android.annotation.SuppressLint;
+import android.app.TimePickerDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -23,6 +24,9 @@ import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
+
+import java.util.Calendar;
 
 public final class CallActivity extends android.app.Activity {
     private final BroadcastReceiver updates = new BroadcastReceiver() {
@@ -240,7 +244,7 @@ public final class CallActivity extends android.app.Activity {
 
         if (session.getBoolean("showDelayOptions", false)
                 && !session.getBoolean("finalizing", false)) {
-            interactionSheet.addView(delayOptions(step, false), optionParams());
+            interactionSheet.addView(delayOptions(step, false), delayOptionParams());
         } else {
             String[] answers = {answerA, answerB, answerC, answerD};
             for (int index = 0; index < answers.length; index++) {
@@ -441,7 +445,7 @@ public final class CallActivity extends android.app.Activity {
         title.setPadding(Ui.dp(this, 2), 0, 0, Ui.dp(this, 10));
         group.addView(title, Ui.matchWrap());
         group.addView(delayOptions(expectedStep, true), new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 58)));
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.bottomMargin = Ui.dp(this, 14);
@@ -456,7 +460,17 @@ public final class CallActivity extends android.app.Activity {
         return params;
     }
 
+    private LinearLayout.LayoutParams delayOptionParams() {
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.bottomMargin = Ui.dp(this, 14);
+        return params;
+    }
+
     private LinearLayout delayOptions(int expectedStep, boolean directDelay) {
+        LinearLayout group = new LinearLayout(this);
+        group.setOrientation(LinearLayout.VERTICAL);
+
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         String[] labels = new String[CallService.DELAY_MINUTES.length];
@@ -474,7 +488,61 @@ public final class CallActivity extends android.app.Activity {
             if (index < labels.length - 1) params.setMarginEnd(Ui.dp(this, 7));
             row.addView(button, params);
         }
-        return row;
+        group.addView(row, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 58)));
+
+        TextView chooseTime = centered(AppLanguage.ui(callLanguage(), "Choose time"),
+                14, Ui.GARDEN_INK, true);
+        chooseTime.setBackground(Ui.actionBackground(this, Ui.ACCEPT_LIGHT, 18));
+        chooseTime.setOnClickListener(view -> showDelayTimePicker(chooseTime, expectedStep));
+        LinearLayout.LayoutParams chooseParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 52));
+        chooseParams.topMargin = Ui.dp(this, 8);
+        group.addView(chooseTime, chooseParams);
+        return group;
+    }
+
+    private void showDelayTimePicker(TextView button, int expectedStep) {
+        if (optionSubmitting) return;
+        Calendar now = Calendar.getInstance();
+        Calendar suggested = (Calendar) now.clone();
+        suggested.add(Calendar.MINUTE, 5);
+        if (suggested.get(Calendar.DAY_OF_YEAR) != now.get(Calendar.DAY_OF_YEAR)
+                || suggested.get(Calendar.YEAR) != now.get(Calendar.YEAR)) {
+            suggested = (Calendar) now.clone();
+            suggested.set(Calendar.HOUR_OF_DAY, 23);
+            suggested.set(Calendar.MINUTE, 59);
+        }
+        suggested.set(Calendar.SECOND, 0);
+        suggested.set(Calendar.MILLISECOND, 0);
+        if (suggested.getTimeInMillis() <= now.getTimeInMillis()) {
+            Toast.makeText(this, AppLanguage.ui(callLanguage(),
+                    "Choose a time later today."), Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        new TimePickerDialog(this, (picker, hour, minute) -> {
+            Calendar selected = Calendar.getInstance();
+            selected.set(Calendar.HOUR_OF_DAY, hour);
+            selected.set(Calendar.MINUTE, minute);
+            selected.set(Calendar.SECOND, 0);
+            selected.set(Calendar.MILLISECOND, 0);
+            if (!ReminderScheduler.isLaterToday(
+                    System.currentTimeMillis(), selected.getTimeInMillis())) {
+                Toast.makeText(this, AppLanguage.ui(callLanguage(),
+                        "Choose a time later today."), Toast.LENGTH_SHORT).show();
+                return;
+            }
+            optionSubmitting = true;
+            button.setText(android.text.format.DateFormat.getTimeFormat(this)
+                    .format(selected.getTime()));
+            button.setTextColor(Color.WHITE);
+            button.setBackground(Ui.actionBackground(this, Ui.ACCEPT, 18));
+            button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            button.postDelayed(() -> dispatchDelayAt(
+                    selected.getTimeInMillis(), expectedStep), 140L);
+        }, suggested.get(Calendar.HOUR_OF_DAY), suggested.get(Calendar.MINUTE),
+                android.text.format.DateFormat.is24HourFormat(this)).show();
     }
 
     private void selectDelayOption(TextView button, int option, int expectedStep,
@@ -507,6 +575,13 @@ public final class CallActivity extends android.app.Activity {
     private void dispatchDelay(int option, int expectedStep) {
         Intent intent = new Intent(this, CallService.class).setAction(CallService.ACTION_DELAY)
                 .putExtra(CallService.EXTRA_OPTION, option)
+                .putExtra(CallService.EXTRA_OPTION_STEP, expectedStep);
+        startService(intent);
+    }
+
+    private void dispatchDelayAt(long at, int expectedStep) {
+        Intent intent = new Intent(this, CallService.class).setAction(CallService.ACTION_DELAY_AT)
+                .putExtra(CallService.EXTRA_DELAY_AT, at)
                 .putExtra(CallService.EXTRA_OPTION_STEP, expectedStep);
         startService(intent);
     }
