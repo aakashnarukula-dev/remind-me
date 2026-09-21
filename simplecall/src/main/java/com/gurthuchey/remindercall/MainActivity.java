@@ -899,6 +899,7 @@ public final class MainActivity extends FragmentActivity {
                     .setMessage(existing.label + " reminders will stop.")
                     .setNegativeButton("Cancel", null)
                     .setPositiveButton("Delete", (ignored, which) -> {
+                        ReminderScheduler.clearProgressIfOccurrenceChanged(this, existing, null);
                         config.schedules.remove(existing);
                         dialog.dismiss();
                         saveOwnSchedules(config);
