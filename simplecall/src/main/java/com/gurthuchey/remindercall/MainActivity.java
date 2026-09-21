@@ -1109,6 +1109,7 @@ public final class MainActivity extends FragmentActivity {
             draft.enabled = true;
             if (existing == null) config.schedules.add(draft);
             else {
+                ReminderScheduler.clearProgressIfOccurrenceChanged(this, existing, draft);
                 int index = config.schedules.indexOf(existing);
                 if (index >= 0) config.schedules.set(index, draft);
             }

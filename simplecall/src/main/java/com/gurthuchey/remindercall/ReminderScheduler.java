@@ -60,7 +60,51 @@ final class ReminderScheduler {
             RemoteStore.Config replacement) {
         cancelScheduledCalls(context, previous);
         cancelRetriesRemovedByUpdate(context, previous, replacement);
+        clearProgressChangedByUpdate(context, previous, replacement);
         scheduleAll(context, replacement);
+    }
+
+    static boolean occurrenceChanged(RemoteStore.Schedule previous,
+            RemoteStore.Schedule replacement) {
+        if (previous == null || replacement == null) return false;
+        return previous.hour != replacement.hour
+                || previous.minute != replacement.minute
+                || previous.days != replacement.days
+                || previous.preMinutes != replacement.preMinutes
+                || previous.confirmationMinutes != replacement.confirmationMinutes
+                || previous.enabled != replacement.enabled
+                || previous.custom() != replacement.custom();
+    }
+
+    static void clearProgressIfOccurrenceChanged(Context context,
+            RemoteStore.Schedule previous, RemoteStore.Schedule replacement) {
+        if (!occurrenceChanged(previous, replacement)) return;
+        clearProgress(context, replacement.id);
+    }
+
+    private static void clearProgressChangedByUpdate(Context context,
+            RemoteStore.Config previous, RemoteStore.Config replacement) {
+        if (previous == null || replacement == null) return;
+        for (RemoteStore.Schedule before : previous.schedules) {
+            RemoteStore.Schedule after = find(replacement, before.id);
+            clearProgressIfOccurrenceChanged(context, before, after);
+        }
+    }
+
+    private static RemoteStore.Schedule find(RemoteStore.Config config, String id) {
+        if (config == null || id == null) return null;
+        for (RemoteStore.Schedule schedule : config.schedules) {
+            if (id.equals(schedule.id)) return schedule;
+        }
+        return null;
+    }
+
+    private static void clearProgress(Context context, String scheduleId) {
+        if (scheduleId == null || scheduleId.trim().isEmpty()) return;
+        cancelRetry(context, scheduleId, PHASE_MEDICINE);
+        cancelRetry(context, scheduleId, PHASE_MEAL);
+        cancelRetry(context, scheduleId, PHASE_CONFIRMATION);
+        new DailyCallStatus(context).clearSchedule(scheduleId);
     }
 
     private static void cancelScheduledCalls(Context context, RemoteStore.Config config) {
