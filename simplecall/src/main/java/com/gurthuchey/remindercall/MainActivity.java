@@ -676,11 +676,11 @@ public final class MainActivity extends FragmentActivity {
             DailyCallStatus.Display display = dailyCallStatus.display(
                     schedule, System.currentTimeMillis());
             if (DailyCallStatus.isIncomplete(display.kind)) {
-                trailing.addView(statusPill(false), Ui.margins(
+                trailing.addView(statusPill(false, schedule), Ui.margins(
                         ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
                         this, 0, 3, 0, 0));
             } else if (DailyCallStatus.COMPLETED.equals(display.kind)) {
-                trailing.addView(statusPill(true), Ui.margins(
+                trailing.addView(statusPill(true, schedule), Ui.margins(
                         ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
                         this, 0, 3, 0, 0));
             }
@@ -705,7 +705,7 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private View statusPill(boolean completed) {
+    private View statusPill(boolean completed, RemoteStore.Schedule schedule) {
         TextView pill = Ui.text(this,
                 completed ? DailyCallStatus.completedLabel(currentLanguage())
                         : DailyCallStatus.incompleteLabel(currentLanguage()),
@@ -715,7 +715,99 @@ public final class MainActivity extends FragmentActivity {
         pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
         pill.setBackground(Ui.rounded(completed ? Color.rgb(226, 245, 233)
                 : Color.rgb(255, 242, 211), 11, this));
+        pill.setClickable(true);
+        pill.setContentDescription("Change today's status for " + schedule.label);
+        pill.setOnClickListener(v -> showDailyStatusDialog(schedule, completed));
         return pill;
+    }
+
+    private void showDailyStatusDialog(RemoteStore.Schedule schedule, boolean completed) {
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        sheet.setPadding(Ui.dp(this, 18), Ui.dp(this, 8),
+                Ui.dp(this, 18), Ui.dp(this, 16));
+        sheet.setBackground(Ui.topRounded(Ui.WHITE, 28, this));
+        sheet.setClipChildren(false);
+        sheet.setClipToPadding(false);
+        Ui.safeArea(sheet, true, false, true, true);
+        sheet.addView(draggableSheetHandle(dialog, sheet), Ui.margins(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 24), this, 0, 0, 0, 2));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(Ui.text(this, "Today's status", 22, Ui.INK, true),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView close = Ui.text(this, "×", 26, Ui.MUTED, false);
+        close.setGravity(Gravity.CENTER);
+        close.setContentDescription("Close status editor");
+        close.setBackground(Ui.rounded(Ui.RAISED2, 21, this));
+        close.setOnClickListener(v -> dialog.dismiss());
+        header.addView(close, new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42)));
+        sheet.addView(header);
+
+        TextView reminder = Ui.text(this, schedule.label, 15, Ui.MUTED, false);
+        sheet.addView(reminder, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 2, 0, 12));
+
+        LinearLayout choices = new LinearLayout(this);
+        Button done = button(DailyCallStatus.completedLabel(currentLanguage()),
+                Color.rgb(226, 245, 233), Color.rgb(38, 117, 72));
+        done.setBackground(Ui.roundedWithStroke(Color.rgb(226, 245, 233), 14,
+                completed ? Color.rgb(38, 117, 72) : Ui.LINE, 1, this));
+        done.setOnClickListener(v -> {
+            ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEAL);
+            ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEDICINE);
+            ReminderScheduler.cancelRetry(this, schedule.id,
+                    ReminderScheduler.PHASE_CONFIRMATION);
+            dailyCallStatus.markCompleted(schedule.id, ReminderScheduler.PHASE_MEDICINE);
+            if (schedule.confirmationMinutes > 0) {
+                dailyCallStatus.markCompleted(schedule.id,
+                        ReminderScheduler.PHASE_CONFIRMATION);
+            }
+            dialog.dismiss();
+            render();
+        });
+        choices.addView(done, new LinearLayout.LayoutParams(
+                0, Ui.dp(this, 52), 1f));
+
+        Button notDone = button(DailyCallStatus.incompleteLabel(currentLanguage()),
+                Color.rgb(255, 242, 211), Color.rgb(139, 98, 25));
+        notDone.setBackground(Ui.roundedWithStroke(Color.rgb(255, 242, 211), 14,
+                completed ? Ui.LINE : Color.rgb(139, 98, 25), 1, this));
+        notDone.setOnClickListener(v -> {
+            dailyCallStatus.markIncomplete(schedule.id);
+            dialog.dismiss();
+            render();
+        });
+        LinearLayout.LayoutParams notDoneParams = new LinearLayout.LayoutParams(
+                0, Ui.dp(this, 52), 1f);
+        notDoneParams.setMarginStart(Ui.dp(this, 8));
+        choices.addView(notDone, notDoneParams);
+        sheet.addView(choices);
+
+        TextView note = Ui.text(this, "Applies to today only", 12, Ui.MUTED, false);
+        note.setGravity(Gravity.CENTER);
+        sheet.addView(note, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10, 0, 0));
+
+        dialog.setContentView(sheet);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setGravity(Gravity.BOTTOM);
+            window.setDimAmount(0.48f);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setNavigationBarColor(Ui.BG);
+            applyLightSystemBars(window);
+            window.setWindowAnimations(R.style.BottomSheetAnimation);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
     }
 
     private void showScheduleDialog(RemoteStore.Config config, RemoteStore.Schedule existing) {

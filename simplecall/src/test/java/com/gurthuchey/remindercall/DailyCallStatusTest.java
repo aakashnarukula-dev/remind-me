@@ -56,6 +56,19 @@ public final class DailyCallStatusTest {
                 DailyCallStatus.COMPLETED, 1_000L, 2_000L));
     }
 
+    @Test public void manualIncompleteOverridesDerivedCardStatus() {
+        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applyManualIncomplete(
+                DailyCallStatus.COMPLETED, true));
+        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applyManualIncomplete(
+                DailyCallStatus.UPCOMING, true));
+        assertEquals(DailyCallStatus.CALLING, DailyCallStatus.applyManualIncomplete(
+                DailyCallStatus.CALLING, true));
+        assertEquals(DailyCallStatus.RETRY, DailyCallStatus.applyManualIncomplete(
+                DailyCallStatus.RETRY, true));
+        assertEquals(DailyCallStatus.COMPLETED, DailyCallStatus.applyManualIncomplete(
+                DailyCallStatus.COMPLETED, false));
+    }
+
     @Test public void completedAndUpcomingRemainDistinct() {
         assertEquals("Completed", DailyCallStatus.completedLabel("en"));
         org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.COMPLETED));

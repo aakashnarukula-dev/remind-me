@@ -26,6 +26,7 @@ final class DailyCallStatus {
     private static final String STATE_RINGING = "ringing";
     private static final String STATE_RETRY = "retry";
     private static final String STATE_COMPLETED = "completed";
+    private static final String STATE_INCOMPLETE = "incomplete";
     private static final long DUE_GRACE_MS = 90_000L;
     private static final long STALE_RING_MS = 2L * 60_000L;
 
@@ -78,6 +79,11 @@ final class DailyCallStatus {
         write(scheduleId, phase, STATE_COMPLETED, 0L, System.currentTimeMillis());
     }
 
+    void markIncomplete(String scheduleId) {
+        write(scheduleId, ReminderScheduler.PHASE_MEDICINE,
+                STATE_INCOMPLETE, 0L, System.currentTimeMillis());
+    }
+
     Display display(RemoteStore.Schedule schedule, long now) {
         Entry meal = schedule.preMinutes > 0
                 ? read(schedule.id, ReminderScheduler.PHASE_MEAL, now) : null;
@@ -95,6 +101,7 @@ final class DailyCallStatus {
         String kind = resolve(scheduledToday, scheduledAt, calling, retryAt > 0L,
                 primaryDone, schedule.confirmationMinutes > 0, confirmationDone, now);
         kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
+        kind = applyManualIncomplete(kind, isIncomplete(primary));
         return new Display(kind, retryAt);
     }
 
@@ -124,6 +131,11 @@ final class DailyCallStatus {
     static String applyTrackingBaseline(String kind, long scheduledAt, long trackingStartedAt) {
         if (MISSED.equals(kind) && scheduledAt < trackingStartedAt) return UNKNOWN;
         return kind;
+    }
+
+    static String applyManualIncomplete(String kind, boolean manuallyIncomplete) {
+        if (!manuallyIncomplete || CALLING.equals(kind) || RETRY.equals(kind)) return kind;
+        return MISSED;
     }
 
     static String incompleteLabel(String language) {
@@ -179,6 +191,10 @@ final class DailyCallStatus {
 
     private static boolean isCompleted(Entry entry) {
         return entry != null && STATE_COMPLETED.equals(entry.state);
+    }
+
+    private static boolean isIncomplete(Entry entry) {
+        return entry != null && STATE_INCOMPLETE.equals(entry.state);
     }
 
     private static long earliestRetry(Entry... entries) {
