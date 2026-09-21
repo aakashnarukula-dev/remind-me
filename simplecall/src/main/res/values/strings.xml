@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Remind me</string>
+    <string name="launcher_name_en" translatable="false">Remind me</string>
+    <string name="launcher_name_te" translatable="false">గుర్తు చేయి</string>
+    <string name="launcher_name_hi" translatable="false">याद दिलाओ</string>
+    <string name="launcher_name_ta" translatable="false">நினைவூட்டு</string>
+    <string name="launcher_name_kn" translatable="false">ನೆನಪಿಸು</string>
+    <string name="launcher_name_ml" translatable="false">ഓർമ്മിപ്പിക്കൂ</string>
     <string name="truecaller_client_id" translatable="false">flparbrmvudm9zvgtxdonsemkp4qvdepju5b4lwyiqe</string>
 </resources>
