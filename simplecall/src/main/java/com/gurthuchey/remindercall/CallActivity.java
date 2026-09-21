@@ -499,6 +499,22 @@ public final class CallActivity extends android.app.Activity {
                 LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 52));
         chooseParams.topMargin = Ui.dp(this, 8);
         group.addView(chooseTime, chooseParams);
+
+        TextView skipToday = centered(AppLanguage.ui(callLanguage(), "Skip for today"),
+                14, Ui.DANGER, true);
+        skipToday.setBackground(Ui.actionBackground(this,
+                Color.rgb(253, 235, 237), 18));
+        skipToday.setOnClickListener(view -> {
+            if (optionSubmitting) return;
+            optionSubmitting = true;
+            view.setEnabled(false);
+            view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
+            send(CallService.ACTION_SKIP_TODAY, -1);
+        });
+        LinearLayout.LayoutParams skipParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, Ui.dp(this, 52));
+        skipParams.topMargin = Ui.dp(this, 8);
+        group.addView(skipToday, skipParams);
         return group;
     }
 
