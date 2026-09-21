@@ -44,5 +44,21 @@ public final class DailyCallStatusTest {
         org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.COMPLETED));
         org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.UPCOMING));
         org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.NOT_TODAY));
+        org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.UNKNOWN));
+    }
+
+    @Test public void remindersBeforeTrackingStartedDoNotBecomeFalseFailures() {
+        assertEquals(DailyCallStatus.UNKNOWN, DailyCallStatus.applyTrackingBaseline(
+                DailyCallStatus.MISSED, 1_000L, 2_000L));
+        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applyTrackingBaseline(
+                DailyCallStatus.MISSED, 3_000L, 2_000L));
+        assertEquals(DailyCallStatus.COMPLETED, DailyCallStatus.applyTrackingBaseline(
+                DailyCallStatus.COMPLETED, 1_000L, 2_000L));
+    }
+
+    @Test public void completedAndUpcomingRemainDistinct() {
+        assertEquals("Completed", DailyCallStatus.completedLabel("en"));
+        org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.COMPLETED));
+        org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.UPCOMING));
     }
 }

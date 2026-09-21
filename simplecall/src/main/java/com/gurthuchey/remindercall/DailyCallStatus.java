@@ -19,8 +19,10 @@ final class DailyCallStatus {
     static final String COMPLETED = "completed";
     static final String MISSED = "missed";
     static final String NOT_TODAY = "not_today";
+    static final String UNKNOWN = "unknown";
 
     private static final String PREFS = "daily_call_status";
+    private static final String TRACKING_STARTED_AT = "tracking_started_at";
     private static final String STATE_RINGING = "ringing";
     private static final String STATE_RETRY = "retry";
     private static final String STATE_COMPLETED = "completed";
@@ -51,10 +53,17 @@ final class DailyCallStatus {
 
     private final Context context;
     private final SharedPreferences preferences;
+    private final long trackingStartedAt;
 
     DailyCallStatus(Context context) {
         this.context = context.getApplicationContext();
         preferences = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        long savedStart = preferences.getLong(TRACKING_STARTED_AT, 0L);
+        if (savedStart <= 0L) {
+            savedStart = System.currentTimeMillis();
+            preferences.edit().putLong(TRACKING_STARTED_AT, savedStart).commit();
+        }
+        trackingStartedAt = savedStart;
     }
 
     void markCalling(String scheduleId, String phase) {
@@ -85,6 +94,7 @@ final class DailyCallStatus {
         long scheduledAt = scheduledAt(schedule.hour, schedule.minute, now);
         String kind = resolve(scheduledToday, scheduledAt, calling, retryAt > 0L,
                 primaryDone, schedule.confirmationMinutes > 0, confirmationDone, now);
+        kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
         return new Display(kind, retryAt);
     }
 
@@ -111,12 +121,26 @@ final class DailyCallStatus {
         return CALLING.equals(kind) || RETRY.equals(kind) || MISSED.equals(kind);
     }
 
+    static String applyTrackingBaseline(String kind, long scheduledAt, long trackingStartedAt) {
+        if (MISSED.equals(kind) && scheduledAt < trackingStartedAt) return UNKNOWN;
+        return kind;
+    }
+
     static String incompleteLabel(String language) {
         int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
                 : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
                 : "ml".equals(language) ? 5 : 0;
         String[] values = {"Not completed", "పూర్తి కాలేదు", "पूरा नहीं हुआ",
                 "முடிக்கவில்லை", "ಪೂರ್ಣಗೊಂಡಿಲ್ಲ", "പൂർത്തിയായില്ല"};
+        return values[index];
+    }
+
+    static String completedLabel(String language) {
+        int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
+                : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
+                : "ml".equals(language) ? 5 : 0;
+        String[] values = {"Completed", "పూర్తయింది", "पूरा हुआ",
+                "முடிந்தது", "ಪೂರ್ಣಗೊಂಡಿದೆ", "പൂർത്തിയായി"};
         return values[index];
     }
 
