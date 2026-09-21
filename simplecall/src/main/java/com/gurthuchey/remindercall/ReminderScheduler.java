@@ -155,6 +155,7 @@ final class ReminderScheduler {
         PendingIntent pending = PendingIntent.getBroadcast(context, retryCode(id, phase), intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
         set(context, at, pending);
+        new DailyCallStatus(context).markRetry(id, phase, at);
     }
 
     static void cancelRetry(Context context, String id, String phase) {
