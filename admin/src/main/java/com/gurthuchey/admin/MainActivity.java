@@ -96,6 +96,7 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        AppLanguage.syncLauncherLabel(this);
         getWindow().setStatusBarColor(Ui.BG);
         getWindow().setNavigationBarColor(Ui.PAPER);
         applyLightSystemBars(getWindow());

@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Remind me Admin</string>
+    <string name="launcher_name_en" translatable="false">Remind me Admin</string>
+    <string name="launcher_name_te" translatable="false">గుర్తు చేయి అడ్మిన్</string>
+    <string name="launcher_name_hi" translatable="false">याद दिलाओ एडमिन</string>
+    <string name="launcher_name_ta" translatable="false">நினைவூட்டு நிர்வாகி</string>
+    <string name="launcher_name_kn" translatable="false">ನೆನಪಿಸು ನಿರ್ವಾಹಕ</string>
+    <string name="launcher_name_ml" translatable="false">ഓർമ്മിപ്പിക്കൂ അഡ്മിൻ</string>
     <string name="truecaller_client_id" translatable="false">soprrd5odvcnyokurr6yw7xsmk74n1ci4n4pvd2amvy</string>
 </resources>

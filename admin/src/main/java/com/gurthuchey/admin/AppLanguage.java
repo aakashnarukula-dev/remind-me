@@ -1,7 +1,9 @@
 package com.gurthuchey.admin;
 
 import android.app.LocaleManager;
+import android.content.ComponentName;
 import android.content.Context;
+import android.content.pm.PackageManager;
 import android.os.Build;
 import android.os.LocaleList;
 
@@ -28,6 +30,42 @@ final class AppLanguage {
             if (manager != null) {
                 manager.setApplicationLocales(LocaleList.forLanguageTags(code + "-IN"));
             }
+        }
+        syncLauncherLabel(context, code);
+    }
+
+    static void syncLauncherLabel(Context context) {
+        syncLauncherLabel(context, current(context));
+    }
+
+    private static void syncLauncherLabel(Context context, String code) {
+        String selected = launcherSuffix(normalize(code));
+        PackageManager manager = context.getPackageManager();
+        setLauncherState(context, manager, selected, true);
+        for (String suffix : new String[]{"English", "Telugu", "Hindi", "Tamil", "Kannada", "Malayalam"}) {
+            if (!suffix.equals(selected)) setLauncherState(context, manager, suffix, false);
+        }
+    }
+
+    private static void setLauncherState(Context context, PackageManager manager,
+            String suffix, boolean enabled) {
+        ComponentName component = new ComponentName(context.getPackageName(),
+                context.getPackageName() + ".Launcher" + suffix);
+        int state = enabled ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
+        if (manager.getComponentEnabledSetting(component) != state) {
+            manager.setComponentEnabledSetting(component, state, PackageManager.DONT_KILL_APP);
+        }
+    }
+
+    private static String launcherSuffix(String code) {
+        switch (normalize(code)) {
+            case "te": return "Telugu";
+            case "hi": return "Hindi";
+            case "ta": return "Tamil";
+            case "kn": return "Kannada";
+            case "ml": return "Malayalam";
+            default: return "English";
         }
     }
 
