@@ -102,6 +102,22 @@ public final class ReminderSchedulerTest {
                 ReminderScheduler.PHASE_MEAL));
     }
 
+    @Test public void movingReminderTimeInvalidatesOldOccurrenceProgress() {
+        RemoteStore.Schedule before = scheduleAt(17, 0);
+        RemoteStore.Schedule after = scheduleAt(17, 15);
+
+        assertTrue(ReminderScheduler.occurrenceChanged(before, after));
+    }
+
+    @Test public void changingOnlyReminderTitlePreservesOccurrenceProgress() {
+        RemoteStore.Schedule before = scheduleAt(17, 15);
+        before.label = "Egg omelette";
+        RemoteStore.Schedule after = scheduleAt(17, 15);
+        after.label = "Two egg omelette";
+
+        assertFalse(ReminderScheduler.occurrenceChanged(before, after));
+    }
+
     @Test public void confirmationPhaseExistsOnlyWhenEnabledForThatReminder() {
         RemoteStore.Schedule schedule = new RemoteStore.Schedule();
         schedule.id = "cholesterol";
@@ -166,5 +182,16 @@ public final class ReminderSchedulerTest {
                     ids[index], ReminderScheduler.PHASE_MEDICINE)));
         }
         assertEquals(14, identities.size());
+    }
+
+    private static RemoteStore.Schedule scheduleAt(int hour, int minute) {
+        RemoteStore.Schedule schedule = new RemoteStore.Schedule();
+        schedule.id = "egg-omelette";
+        schedule.category = "meal";
+        schedule.hour = hour;
+        schedule.minute = minute;
+        schedule.days = 0b1111111;
+        schedule.enabled = true;
+        return schedule;
     }
 }

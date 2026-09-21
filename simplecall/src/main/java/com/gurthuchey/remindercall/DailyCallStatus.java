@@ -84,6 +84,17 @@ final class DailyCallStatus {
                 STATE_INCOMPLETE, 0L, System.currentTimeMillis());
     }
 
+    void clearSchedule(String scheduleId) {
+        if (scheduleId == null || scheduleId.trim().isEmpty()
+                || "test-call".equals(scheduleId)) return;
+        preferences.edit()
+                .remove(key(scheduleId, ReminderScheduler.PHASE_MEDICINE))
+                .remove(key(scheduleId, ReminderScheduler.PHASE_MEAL))
+                .remove(key(scheduleId, ReminderScheduler.PHASE_CONFIRMATION))
+                .commit();
+        context.sendBroadcast(new Intent(ACTION_CHANGED).setPackage(context.getPackageName()));
+    }
+
     Display display(RemoteStore.Schedule schedule, long now) {
         Entry meal = schedule.preMinutes > 0
                 ? read(schedule.id, ReminderScheduler.PHASE_MEAL, now) : null;
