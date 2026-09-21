@@ -73,6 +73,7 @@ public final class MainActivity extends FragmentActivity {
     };
     private RemoteSync sync;
     private RemoteStore remoteStore;
+    private DailyCallStatus dailyCallStatus;
     private PhoneLogin phoneLogin;
     private String status = "Connecting to Admin…";
     private String loginPhone = "";
@@ -82,6 +83,7 @@ public final class MainActivity extends FragmentActivity {
     private boolean authBusy;
     private boolean truecallerAutoAttempted;
     private boolean scheduleListenerRegistered;
+    private boolean statusListenerRegistered;
     private ScrollView mainScroll;
     private RemoteStore.Config optimisticConfig;
     private final SharedPreferences.OnSharedPreferenceChangeListener scheduleListener =
@@ -91,6 +93,8 @@ public final class MainActivity extends FragmentActivity {
                     render();
                 }
             };
+    private final SharedPreferences.OnSharedPreferenceChangeListener statusListener =
+            (preferences, key) -> runOnUiThread(this::render);
 
     private void applyLightSystemBars(Window window) {
         View decor = window.getDecorView();
@@ -110,6 +114,7 @@ public final class MainActivity extends FragmentActivity {
         getWindow().setNavigationBarColor(Ui.BG);
         applyLightSystemBars(getWindow());
         remoteStore = new RemoteStore(this);
+        dailyCallStatus = new DailyCallStatus(this);
         sync = new RemoteSync(this);
         phoneLogin = new PhoneLogin(this, "user");
         requestNotificationPermission(false);
@@ -137,12 +142,18 @@ public final class MainActivity extends FragmentActivity {
         super.onStart();
         remoteStore.registerChangeListener(scheduleListener);
         scheduleListenerRegistered = true;
+        dailyCallStatus.register(statusListener);
+        statusListenerRegistered = true;
     }
 
     @Override protected void onStop() {
         if (scheduleListenerRegistered) {
             remoteStore.unregisterChangeListener(scheduleListener);
             scheduleListenerRegistered = false;
+        }
+        if (statusListenerRegistered) {
+            dailyCallStatus.unregister(statusListener);
+            statusListenerRegistered = false;
         }
         super.onStop();
     }
@@ -656,12 +667,23 @@ public final class MainActivity extends FragmentActivity {
             wordsParams.setMarginEnd(Ui.dp(this, 8));
             card.addView(words, wordsParams);
 
+            LinearLayout trailing = new LinearLayout(this);
+            trailing.setOrientation(LinearLayout.VERTICAL);
+            trailing.setGravity(Gravity.END);
             TextView time = Ui.text(this, timeText(schedule), 16, Ui.INK, true);
             time.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            LinearLayout.LayoutParams timeParams = new LinearLayout.LayoutParams(
-                    Ui.dp(this, 78), ViewGroup.LayoutParams.WRAP_CONTENT);
-            timeParams.setMarginEnd(Ui.dp(this, 12));
-            card.addView(time, timeParams);
+            trailing.addView(time);
+            DailyCallStatus.Display display = dailyCallStatus.display(
+                    schedule, System.currentTimeMillis());
+            if (DailyCallStatus.isIncomplete(display.kind)) {
+                trailing.addView(incompletePill(), Ui.margins(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
+                        this, 0, 3, 0, 0));
+            }
+            LinearLayout.LayoutParams trailingParams = new LinearLayout.LayoutParams(
+                    Ui.dp(this, 92), ViewGroup.LayoutParams.WRAP_CONTENT);
+            trailingParams.setMarginEnd(Ui.dp(this, 10));
+            card.addView(trailing, trailingParams);
 
             card.addView(Ui.text(this, "›", 24, Ui.GOLD, false));
             card.setOnClickListener(v -> showScheduleDialog(config, schedule));
@@ -677,6 +699,17 @@ public final class MainActivity extends FragmentActivity {
             body.addView(Ui.text(this, "No active reminders.",
                     16, Ui.MUTED, false));
         }
+    }
+
+    private View incompletePill() {
+        TextView pill = Ui.text(this,
+                DailyCallStatus.incompleteLabel(currentLanguage()), 9,
+                Color.rgb(139, 98, 25), true);
+        pill.setGravity(Gravity.CENTER);
+        pill.setSingleLine(true);
+        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.setBackground(Ui.rounded(Color.rgb(255, 242, 211), 11, this));
+        return pill;
     }
 
     private void showScheduleDialog(RemoteStore.Config config, RemoteStore.Schedule existing) {

@@ -218,6 +218,7 @@ public final class CallService extends Service {
         connectedAtMillis = 0L;
         step = 0;
         branch = 0;
+        markCurrentCalling();
         writeSession();
         startForeground(NOTIFICATION_ID, incomingNotification());
         startRingAudio();
@@ -258,6 +259,7 @@ public final class CallService extends Service {
         if (ReminderScheduler.PHASE_MEAL.equals(phase) && step == 0) {
             finalizing = true;
             handler.removeCallbacks(unansweredQuestion);
+            markCurrentCompleted();
             speak(question(), "finish");
             handler.postDelayed(this::finishCall, SPEECH_COMPLETION_TIMEOUT_MS);
             return;
@@ -287,6 +289,7 @@ public final class CallService extends Service {
         }
         if (confirmationCall()) {
             if (step == 0 && option == 0) {
+                markCurrentCompleted();
                 finishWithResponse(SpeechText.medicineTaken(member, language));
             } else if (step == 0 && option == 1) {
                 if (!"test-call".equals(scheduleId)) {
@@ -316,6 +319,7 @@ public final class CallService extends Service {
                     activeSchedule.category, language);
             int nextStep = step + 1;
             if (nextStep >= activeSchedule.questions.size()) {
+                markCurrentCompleted();
                 scheduleConfirmationAfterPrimary();
                 if (response.isEmpty()) finishCall(); else finishWithResponse(response);
             } else if (response.isEmpty()) {
@@ -328,6 +332,7 @@ public final class CallService extends Service {
         if (step == 0) {
             if (option == 0) {
                 if (!ReminderScheduler.PHASE_MEAL.equals(phase)) {
+                    markCurrentCompleted();
                     scheduleConfirmationAfterPrimary();
                 }
                 finishWithResponse(ReminderScheduler.PHASE_MEAL.equals(phase)
@@ -341,6 +346,7 @@ public final class CallService extends Service {
         }
         if (step == 1) {
             if (option == 0) {
+                markCurrentCompleted();
                 scheduleConfirmationAfterPrimary();
                 finishWithResponse(SpeechText.medicineTaken(member, language));
             }
@@ -962,6 +968,18 @@ public final class CallService extends Service {
                 && ReminderScheduler.PHASE_MEDICINE.equals(phase)
                 && activeSchedule != null && activeSchedule.confirmationMinutes > 0) {
             ReminderScheduler.scheduleConfirmation(this, scheduleId);
+        }
+    }
+
+    private void markCurrentCalling() {
+        if (!"test-call".equals(scheduleId)) {
+            new DailyCallStatus(this).markCalling(scheduleId, phase);
+        }
+    }
+
+    private void markCurrentCompleted() {
+        if (!"test-call".equals(scheduleId)) {
+            new DailyCallStatus(this).markCompleted(scheduleId, phase);
         }
     }
 
