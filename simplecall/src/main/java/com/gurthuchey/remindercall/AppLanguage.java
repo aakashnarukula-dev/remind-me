@@ -10,6 +10,7 @@ import android.os.LocaleList;
 import java.util.Locale;
 
 final class AppLanguage {
+    private static final String LAUNCHER_COMPONENT_PACKAGE = "com.gurthuchey.remindercall";
     static final String[] CODES = {"en", "te", "hi", "ta", "kn", "ml"};
     static final String[] NAMES = {"English", "తెలుగు", "हिन्दी", "தமிழ்", "ಕನ್ನಡ", "മലയാളം"};
     private static final String PREFS = "app_language";
@@ -131,7 +132,7 @@ final class AppLanguage {
     private static void setLauncherState(Context context, PackageManager manager,
             String suffix, boolean enabled) {
         ComponentName component = new ComponentName(context.getPackageName(),
-                context.getPackageName() + ".Launcher" + suffix);
+                LAUNCHER_COMPONENT_PACKAGE + ".Launcher" + suffix);
         int state = enabled ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
                 : PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
         if (manager.getComponentEnabledSetting(component) != state) {
