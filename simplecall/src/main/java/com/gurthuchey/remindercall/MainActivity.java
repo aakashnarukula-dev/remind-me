@@ -683,6 +683,10 @@ public final class MainActivity extends FragmentActivity {
                 trailing.addView(statusPill(true, schedule), Ui.margins(
                         ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
                         this, 0, 3, 0, 0));
+            } else if (DailyCallStatus.NOT_TODAY.equals(display.kind)) {
+                trailing.addView(notTodayPill(), Ui.margins(
+                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
+                        this, 0, 3, 0, 0));
             }
             LinearLayout.LayoutParams trailingParams = new LinearLayout.LayoutParams(
                     Ui.dp(this, 92), ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -718,6 +722,17 @@ public final class MainActivity extends FragmentActivity {
         pill.setClickable(true);
         pill.setContentDescription("Change today's status for " + schedule.label);
         pill.setOnClickListener(v -> showDailyStatusDialog(schedule, completed));
+        return pill;
+    }
+
+    private View notTodayPill() {
+        TextView pill = Ui.text(this, DailyCallStatus.notTodayLabel(currentLanguage()),
+                9, Color.rgb(83, 99, 116), true);
+        pill.setGravity(Gravity.CENTER);
+        pill.setSingleLine(true);
+        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.setBackground(Ui.rounded(Color.rgb(232, 239, 245), 11, this));
+        pill.setContentDescription(DailyCallStatus.notTodayLabel(currentLanguage()));
         return pill;
     }
 
