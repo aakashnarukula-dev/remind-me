@@ -74,4 +74,13 @@ public final class DailyCallStatusTest {
         org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.COMPLETED));
         org.junit.Assert.assertFalse(DailyCallStatus.isIncomplete(DailyCallStatus.UPCOMING));
     }
+
+    @Test public void notTodayTagSupportsEveryAppLanguage() {
+        assertEquals("Not today", DailyCallStatus.notTodayLabel("en"));
+        assertEquals("ఈ రోజు లేదు", DailyCallStatus.notTodayLabel("te"));
+        assertEquals("आज नहीं", DailyCallStatus.notTodayLabel("hi"));
+        assertEquals("இன்று இல்லை", DailyCallStatus.notTodayLabel("ta"));
+        assertEquals("ಇಂದು ಇಲ್ಲ", DailyCallStatus.notTodayLabel("kn"));
+        assertEquals("ഇന്ന് ഇല്ല", DailyCallStatus.notTodayLabel("ml"));
+    }
 }

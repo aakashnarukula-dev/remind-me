@@ -156,6 +156,15 @@ final class DailyCallStatus {
         return values[index];
     }
 
+    static String notTodayLabel(String language) {
+        int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
+                : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
+                : "ml".equals(language) ? 5 : 0;
+        String[] values = {"Not today", "ఈ రోజు లేదు", "आज नहीं",
+                "இன்று இல்லை", "ಇಂದು ಇಲ್ಲ", "ഇന്ന് ഇല്ല"};
+        return values[index];
+    }
+
     private void write(String scheduleId, String phase, String state, long nextAt, long now) {
         if (scheduleId == null || scheduleId.trim().isEmpty()
                 || "test-call".equals(scheduleId)) return;
