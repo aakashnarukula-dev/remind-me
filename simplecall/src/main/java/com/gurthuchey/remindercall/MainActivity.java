@@ -737,6 +737,8 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showDailyStatusDialog(RemoteStore.Schedule schedule, boolean completed) {
+        boolean skippedToday = dailyCallStatus.isSkippedToday(
+                schedule.id, System.currentTimeMillis());
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setCanceledOnTouchOutside(true);
@@ -792,7 +794,7 @@ public final class MainActivity extends FragmentActivity {
         Button notDone = button(DailyCallStatus.incompleteLabel(currentLanguage()),
                 Color.rgb(255, 242, 211), Color.rgb(139, 98, 25));
         notDone.setBackground(Ui.roundedWithStroke(Color.rgb(255, 242, 211), 14,
-                completed ? Ui.LINE : Color.rgb(139, 98, 25), 1, this));
+                !completed && !skippedToday ? Color.rgb(139, 98, 25) : Ui.LINE, 1, this));
         notDone.setOnClickListener(v -> {
             dailyCallStatus.markIncomplete(schedule.id);
             dialog.dismiss();
@@ -803,6 +805,19 @@ public final class MainActivity extends FragmentActivity {
         notDoneParams.setMarginStart(Ui.dp(this, 8));
         choices.addView(notDone, notDoneParams);
         sheet.addView(choices);
+
+        Button skipToday = button(AppLanguage.ui(currentLanguage(), "Skip for today"),
+                Color.rgb(253, 235, 237), Ui.DANGER);
+        skipToday.setBackground(Ui.roundedWithStroke(Color.rgb(253, 235, 237), 14,
+                skippedToday ? Ui.DANGER : Ui.LINE, 1, this));
+        skipToday.setOnClickListener(v -> {
+            dailyCallStatus.markSkippedToday(schedule.id);
+            ReminderScheduler.skipRemainingToday(this, schedule.id);
+            dialog.dismiss();
+            render();
+        });
+        sheet.addView(skipToday, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                Ui.dp(this, 52), 0, 8, 0, 0));
 
         TextView note = Ui.text(this, "Applies to today only", 12, Ui.MUTED, false);
         note.setGravity(Gravity.CENTER);
