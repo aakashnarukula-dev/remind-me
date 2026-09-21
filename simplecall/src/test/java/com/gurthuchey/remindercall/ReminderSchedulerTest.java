@@ -118,6 +118,19 @@ public final class ReminderSchedulerTest {
         assertFalse(ReminderScheduler.occurrenceChanged(before, after));
     }
 
+    @Test public void removingReminderInvalidatesOldOccurrenceProgress() {
+        assertTrue(ReminderScheduler.occurrenceChanged(scheduleAt(17, 15), null));
+        assertFalse(ReminderScheduler.occurrenceChanged(null, scheduleAt(17, 15)));
+    }
+
+    @Test public void staleRetryRunsOnlyIfScheduleCacheIsUnavailable() {
+        assertTrue(AlarmReceiver.shouldDeliver(false, true, true));
+        assertTrue(AlarmReceiver.shouldDeliver(true, true, true));
+        assertTrue(AlarmReceiver.shouldDeliver(true, false, false));
+        assertFalse(AlarmReceiver.shouldDeliver(false, false, false));
+        assertFalse(AlarmReceiver.shouldDeliver(true, true, false));
+    }
+
     @Test public void confirmationPhaseExistsOnlyWhenEnabledForThatReminder() {
         RemoteStore.Schedule schedule = new RemoteStore.Schedule();
         schedule.id = "cholesterol";

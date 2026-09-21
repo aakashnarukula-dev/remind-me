@@ -66,7 +66,8 @@ final class ReminderScheduler {
 
     static boolean occurrenceChanged(RemoteStore.Schedule previous,
             RemoteStore.Schedule replacement) {
-        if (previous == null || replacement == null) return false;
+        if (previous == null) return false;
+        if (replacement == null) return true;
         return previous.hour != replacement.hour
                 || previous.minute != replacement.minute
                 || previous.days != replacement.days
@@ -79,7 +80,7 @@ final class ReminderScheduler {
     static void clearProgressIfOccurrenceChanged(Context context,
             RemoteStore.Schedule previous, RemoteStore.Schedule replacement) {
         if (!occurrenceChanged(previous, replacement)) return;
-        clearProgress(context, replacement.id);
+        clearProgress(context, replacement == null ? previous.id : replacement.id);
     }
 
     private static void clearProgressChangedByUpdate(Context context,

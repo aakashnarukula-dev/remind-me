@@ -11,7 +11,7 @@ public final class AlarmReceiver extends BroadcastReceiver {
         RemoteStore.Config config = new RemoteStore(context).load();
         RemoteStore.Schedule schedule = ReminderScheduler.active(config, id, phase);
         boolean retry = intent.getBooleanExtra(ReminderScheduler.EXTRA_RETRY, false);
-        if (schedule == null && !retry) return;
+        if (!shouldDeliver(retry, config != null, schedule != null)) return;
         String label = schedule == null
                 ? intent.getStringExtra(ReminderScheduler.EXTRA_LABEL) : schedule.label;
         String member = config == null
@@ -42,5 +42,10 @@ public final class AlarmReceiver extends BroadcastReceiver {
                 .putExtra("doseHour", schedule == null ? -1 : schedule.hour)
                 .putExtra("preMinutes", preMinutes);
         context.startForegroundService(service);
+    }
+
+    /** A persisted retry may use its payload only while the local schedule cache is unavailable. */
+    static boolean shouldDeliver(boolean retry, boolean configAvailable, boolean scheduleActive) {
+        return scheduleActive || (retry && !configAvailable);
     }
 }
