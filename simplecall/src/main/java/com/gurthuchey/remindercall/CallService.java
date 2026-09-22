@@ -413,7 +413,7 @@ public final class CallService extends Service {
     private void chooseDelayAt(long at, int expectedStep) {
         boolean delayAvailable = selectingDelay || customCall() || step == 2;
         if (!active || !answered || finalizing || transitioning || !delayAvailable
-                || expectedStep != step || !ReminderScheduler.isLaterToday(
+                || expectedStep != step || !ReminderScheduler.isAllowedDelayTime(
                         System.currentTimeMillis(), at)) return;
         handler.removeCallbacks(unansweredQuestion);
         if (!"test-call".equals(scheduleId)
@@ -421,7 +421,8 @@ public final class CallService extends Service {
                         label, member, preMinutes, at)) return;
         String time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
                 .format(new Date(at));
-        finishWithResponse(SpeechText.reminderDelayedUntil(time, language));
+        boolean tomorrow = !ReminderScheduler.isSameLocalDay(System.currentTimeMillis(), at);
+        finishWithResponse(SpeechText.reminderDelayedUntil(time, tomorrow, language));
     }
 
     private void announceDelayQuestion() {

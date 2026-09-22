@@ -31,6 +31,7 @@ final class DailyCallStatus {
     private static final String STATE_SKIPPED = "skipped_today";
     private static final long DUE_GRACE_MS = 90_000L;
     private static final long STALE_RING_MS = 2L * 60_000L;
+    private static final long ROLLOVER_GRACE_MS = 2L * 60_000L;
 
     static final class Display {
         final String kind;
@@ -43,11 +44,13 @@ final class DailyCallStatus {
     }
 
     private static final class Entry {
+        final int day;
         final String state;
         final long nextAt;
         final long updatedAt;
 
-        Entry(String state, long nextAt, long updatedAt) {
+        Entry(int day, String state, long nextAt, long updatedAt) {
+            this.day = day;
             this.state = state;
             this.nextAt = nextAt;
             this.updatedAt = updatedAt;
@@ -70,30 +73,39 @@ final class DailyCallStatus {
     }
 
     void markCalling(String scheduleId, String phase) {
-        write(scheduleId, phase, STATE_RINGING, 0L, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        write(scheduleId, phase, STATE_RINGING, 0L, now,
+                occurrenceDay(scheduleId, phase, now));
     }
 
     void markRetry(String scheduleId, String phase, long nextAt) {
-        write(scheduleId, phase, STATE_RETRY, nextAt, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        write(scheduleId, phase, STATE_RETRY, nextAt, now,
+                occurrenceDay(scheduleId, phase, now));
     }
 
     void markCompleted(String scheduleId, String phase) {
-        write(scheduleId, phase, STATE_COMPLETED, 0L, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        write(scheduleId, phase, STATE_COMPLETED, 0L, now,
+                occurrenceDay(scheduleId, phase, now));
     }
 
     void markIncomplete(String scheduleId) {
-        write(scheduleId, ReminderScheduler.PHASE_MEDICINE,
-                STATE_INCOMPLETE, 0L, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        write(scheduleId, ReminderScheduler.PHASE_MEDICINE, STATE_INCOMPLETE, 0L, now,
+                displayDay(now));
     }
 
     void markSkippedToday(String scheduleId) {
-        write(scheduleId, ReminderScheduler.PHASE_MEDICINE,
-                STATE_SKIPPED, 0L, System.currentTimeMillis());
+        long now = System.currentTimeMillis();
+        write(scheduleId, ReminderScheduler.PHASE_MEDICINE, STATE_SKIPPED, 0L, now,
+                occurrenceDay(scheduleId, ReminderScheduler.PHASE_MEDICINE, now));
     }
 
     boolean isSkippedToday(String scheduleId, long now) {
         if (scheduleId == null || scheduleId.trim().isEmpty()) return false;
-        return isSkipped(read(scheduleId, ReminderScheduler.PHASE_MEDICINE, now));
+        return isSkipped(readForDay(scheduleId, ReminderScheduler.PHASE_MEDICINE,
+                dayKey(now)));
     }
 
     void clearSchedule(String scheduleId) {
@@ -108,19 +120,21 @@ final class DailyCallStatus {
     }
 
     Display display(RemoteStore.Schedule schedule, long now) {
+        int displayDay = displayDay(now);
+        long referenceTime = referenceTime(displayDay, now);
         Entry meal = schedule.preMinutes > 0
-                ? read(schedule.id, ReminderScheduler.PHASE_MEAL, now) : null;
-        Entry primary = read(schedule.id, ReminderScheduler.PHASE_MEDICINE, now);
+                ? readForDay(schedule.id, ReminderScheduler.PHASE_MEAL, displayDay) : null;
+        Entry primary = readForDay(schedule.id, ReminderScheduler.PHASE_MEDICINE, displayDay);
         Entry confirmation = schedule.confirmationMinutes > 0
-                ? read(schedule.id, ReminderScheduler.PHASE_CONFIRMATION, now) : null;
+                ? readForDay(schedule.id, ReminderScheduler.PHASE_CONFIRMATION, displayDay) : null;
 
         boolean calling = isCalling(meal, now) || isCalling(primary, now)
                 || isCalling(confirmation, now);
         long retryAt = earliestRetry(meal, primary, confirmation);
         boolean primaryDone = isCompleted(primary);
         boolean confirmationDone = isCompleted(confirmation);
-        boolean scheduledToday = isScheduledToday(schedule.days, now);
-        long scheduledAt = scheduledAt(schedule.hour, schedule.minute, now);
+        boolean scheduledToday = isScheduledToday(schedule.days, referenceTime);
+        long scheduledAt = scheduledAt(schedule.hour, schedule.minute, referenceTime);
         String kind = resolve(scheduledToday, scheduledAt, calling, retryAt > 0L,
                 primaryDone, schedule.confirmationMinutes > 0, confirmationDone, now);
         kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
@@ -202,12 +216,13 @@ final class DailyCallStatus {
         return values[index];
     }
 
-    private void write(String scheduleId, String phase, String state, long nextAt, long now) {
+    private void write(String scheduleId, String phase, String state, long nextAt, long now,
+            int statusDay) {
         if (scheduleId == null || scheduleId.trim().isEmpty()
                 || "test-call".equals(scheduleId)) return;
         try {
             String value = new JSONObject()
-                    .put("day", dayKey(now))
+                    .put("day", statusDay)
                     .put("state", state)
                     .put("nextAt", Math.max(0L, nextAt))
                     .put("updatedAt", now)
@@ -217,17 +232,102 @@ final class DailyCallStatus {
         } catch (Exception ignored) {}
     }
 
-    private Entry read(String scheduleId, String phase, long now) {
+    private Entry readForDay(String scheduleId, String phase, int statusDay) {
+        Entry entry = readRaw(scheduleId, phase);
+        return entry != null && entry.day == statusDay ? entry : null;
+    }
+
+    private Entry readRaw(String scheduleId, String phase) {
         String raw = preferences.getString(key(scheduleId, phase), null);
         if (raw == null) return null;
         try {
             JSONObject value = new JSONObject(raw);
-            if (value.optInt("day", -1) != dayKey(now)) return null;
-            return new Entry(value.optString("state", ""), value.optLong("nextAt", 0L),
-                    value.optLong("updatedAt", 0L));
+            return new Entry(value.optInt("day", -1), value.optString("state", ""),
+                    value.optLong("nextAt", 0L), value.optLong("updatedAt", 0L));
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    private int occurrenceDay(String scheduleId, String phase, long now) {
+        Entry existing = readRaw(scheduleId, phase);
+        if (existing != null && (STATE_RETRY.equals(existing.state)
+                || STATE_RINGING.equals(existing.state))) {
+            return existing.day;
+        }
+        return dayKey(now);
+    }
+
+    private int displayDay(long now) {
+        int current = dayKey(now);
+        int heldDay = current;
+        long latestHold = 0L;
+        for (Object raw : preferences.getAll().values()) {
+            if (!(raw instanceof String)) continue;
+            Entry entry = parse((String) raw);
+            if (entry == null || entry.day == current) continue;
+            long holdUntil = holdUntil(entry);
+            if (holdUntil > now && holdUntil > latestHold) {
+                latestHold = holdUntil;
+                heldDay = entry.day;
+            }
+        }
+        return heldDay;
+    }
+
+    long nextRolloverAt(long now) {
+        int current = dayKey(now);
+        long midnight = nextLocalDayStart(now);
+        long rollover = midnight;
+        boolean carriedDay = false;
+        for (Object raw : preferences.getAll().values()) {
+            if (!(raw instanceof String)) continue;
+            Entry entry = parse((String) raw);
+            if (entry == null) continue;
+            long holdUntil = holdUntil(entry);
+            if (holdUntil <= now) continue;
+            if (entry.day != current) {
+                carriedDay = true;
+                rollover = Math.max(rollover == midnight ? 0L : rollover, holdUntil);
+            } else if (holdUntil > midnight) {
+                rollover = Math.max(rollover, holdUntil);
+            }
+        }
+        return carriedDay ? Math.max(now + 1_000L, rollover) : rollover;
+    }
+
+    private static Entry parse(String raw) {
+        try {
+            JSONObject value = new JSONObject(raw);
+            if (!value.has("day") || !value.has("state")) return null;
+            return new Entry(value.optInt("day", -1), value.optString("state", ""),
+                    value.optLong("nextAt", 0L), value.optLong("updatedAt", 0L));
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private static long holdUntil(Entry entry) {
+        if (entry == null) return 0L;
+        if (STATE_RETRY.equals(entry.state) && entry.nextAt > 0L) {
+            return entry.nextAt + ROLLOVER_GRACE_MS;
+        }
+        if (STATE_RINGING.equals(entry.state) && entry.updatedAt > 0L) {
+            return entry.updatedAt + STALE_RING_MS;
+        }
+        return 0L;
+    }
+
+    private long referenceTime(int statusDay, long now) {
+        if (statusDay == dayKey(now)) return now;
+        for (Object raw : preferences.getAll().values()) {
+            if (!(raw instanceof String)) continue;
+            Entry entry = parse((String) raw);
+            if (entry != null && entry.day == statusDay && entry.updatedAt > 0L) {
+                return entry.updatedAt;
+            }
+        }
+        return now;
     }
 
     private static boolean isCalling(Entry entry, long now) {
@@ -278,6 +378,17 @@ final class DailyCallStatus {
         Calendar calendar = Calendar.getInstance();
         calendar.setTimeInMillis(value);
         return calendar.get(Calendar.YEAR) * 1000 + calendar.get(Calendar.DAY_OF_YEAR);
+    }
+
+    static long nextLocalDayStart(long now) {
+        Calendar tomorrow = Calendar.getInstance();
+        tomorrow.setTimeInMillis(now);
+        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
+        tomorrow.set(Calendar.HOUR_OF_DAY, 0);
+        tomorrow.set(Calendar.MINUTE, 0);
+        tomorrow.set(Calendar.SECOND, 0);
+        tomorrow.set(Calendar.MILLISECOND, 0);
+        return tomorrow.getTimeInMillis();
     }
 
     private static String key(String scheduleId, String phase) {

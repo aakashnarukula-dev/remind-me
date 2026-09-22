@@ -203,7 +203,7 @@ final class ReminderScheduler {
             cancelRetry(context, id, phase);
             return false;
         }
-        if (!isLaterToday(System.currentTimeMillis(), at)) return false;
+        if (!isAllowedDelayTime(System.currentTimeMillis(), at)) return false;
         saveRetry(context, id, phase, label, member, preMinutes, at);
         scheduleRetryAt(context, id, phase, label, member, preMinutes, at);
         return true;
@@ -220,16 +220,35 @@ final class ReminderScheduler {
                 && current.get(Calendar.DAY_OF_YEAR) == selected.get(Calendar.DAY_OF_YEAR);
     }
 
+    /** A clock time already passed today means that time tomorrow, never a past alarm. */
+    static long selectedDelayAt(long now, int hour, int minute) {
+        Calendar selected = Calendar.getInstance();
+        selected.setTimeInMillis(now);
+        selected.set(Calendar.HOUR_OF_DAY, Math.max(0, Math.min(23, hour)));
+        selected.set(Calendar.MINUTE, Math.max(0, Math.min(59, minute)));
+        selected.set(Calendar.SECOND, 0);
+        selected.set(Calendar.MILLISECOND, 0);
+        if (selected.getTimeInMillis() <= now) selected.add(Calendar.DAY_OF_YEAR, 1);
+        return selected.getTimeInMillis();
+    }
+
+    static boolean isAllowedDelayTime(long now, long at) {
+        return at > now && at <= now + 24L * 60L * 60_000L;
+    }
+
+    static boolean isSameLocalDay(long first, long second) {
+        Calendar one = Calendar.getInstance();
+        one.setTimeInMillis(first);
+        Calendar two = Calendar.getInstance();
+        two.setTimeInMillis(second);
+        return one.get(Calendar.ERA) == two.get(Calendar.ERA)
+                && one.get(Calendar.YEAR) == two.get(Calendar.YEAR)
+                && one.get(Calendar.DAY_OF_YEAR) == two.get(Calendar.DAY_OF_YEAR);
+    }
+
     static long schedulingFloor(long requestedAfter, long now, boolean skippedToday) {
         if (!skippedToday) return requestedAfter;
-        Calendar tomorrow = Calendar.getInstance();
-        tomorrow.setTimeInMillis(now);
-        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
-        tomorrow.set(Calendar.HOUR_OF_DAY, 0);
-        tomorrow.set(Calendar.MINUTE, 0);
-        tomorrow.set(Calendar.SECOND, 0);
-        tomorrow.set(Calendar.MILLISECOND, 0);
-        return Math.max(requestedAfter, tomorrow.getTimeInMillis());
+        return Math.max(requestedAfter, DailyCallStatus.nextLocalDayStart(now));
     }
 
     static void scheduleConfirmation(Context context, String id) {
