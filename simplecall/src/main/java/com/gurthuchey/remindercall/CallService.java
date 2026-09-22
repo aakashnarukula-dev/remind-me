@@ -24,6 +24,7 @@ import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.UtteranceProgressListener;
+import android.util.Log;
 
 import java.util.Locale;
 import java.util.Calendar;
@@ -31,6 +32,7 @@ import java.util.Date;
 import java.io.File;
 
 public final class CallService extends Service {
+    private static final String TAG = "ReminderCallService";
     static final String CALLER_NAME = "చిట్టి";
     static final String ACTION_RING = "com.gurthuchey.remindercall.RING";
     static final String ACTION_ANSWER = "com.gurthuchey.remindercall.ANSWER";
@@ -160,7 +162,14 @@ public final class CallService extends Service {
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         String action = intent == null ? null : intent.getAction();
-        if (ACTION_RING.equals(action)) startRinging(intent);
+        if (ACTION_RING.equals(action)) {
+            // AlarmReceiver starts this as a foreground service. Android requires
+            // startForeground() immediately for every such start, including duplicate,
+            // skipped and call-conflict paths. Waiting until after those checks caused
+            // ForegroundServiceDidNotStartInTimeException and killed the reminder process.
+            enterRingForeground(intent);
+            startRinging(intent);
+        }
         else if (ACTION_ANSWER.equals(action)) answer();
         else if (ACTION_REJECT.equals(action)) reject(false);
         else if (ACTION_OPTION.equals(action)) choose(intent.getIntExtra(EXTRA_OPTION, -1),
@@ -194,6 +203,8 @@ public final class CallService extends Service {
                 ReminderScheduler.scheduleRetry(this, requestedId, requestedPhase,
                         requestedLabel, requestedMember, requestedPreMinutes);
             }
+            Log.i(TAG, "Deferring duplicate reminder " + requestedId + " / "
+                    + requestedPhase);
             return;
         }
         scheduleId = requestedId;
@@ -208,7 +219,8 @@ public final class CallService extends Service {
                 && new DailyCallStatus(this).isSkippedToday(scheduleId,
                         System.currentTimeMillis())) {
             ReminderScheduler.skipRemainingToday(this, scheduleId);
-            stopSelf();
+            Log.i(TAG, "Stopping skipped reminder " + scheduleId + " / " + phase);
+            stopWithoutCall();
             return;
         }
         language = activeSchedule == null
@@ -220,7 +232,9 @@ public final class CallService extends Service {
                 ReminderScheduler.scheduleRetry(this, scheduleId, phase,
                         label, member, preMinutes);
             }
-            stopSelf();
+            Log.i(TAG, "Stopping reminder while another call is active " + scheduleId
+                    + " / " + phase);
+            stopWithoutCall();
             return;
         }
         active = true;
@@ -236,6 +250,7 @@ public final class CallService extends Service {
         markCurrentCalling();
         writeSession();
         startForeground(NOTIFICATION_ID, incomingNotification());
+        Log.i(TAG, "Ringing " + scheduleId + " / " + phase);
         startRingAudio();
         handler.removeCallbacks(missedCall);
         handler.postDelayed(missedCall, RING_TIMEOUT_MS);
@@ -705,13 +720,13 @@ public final class CallService extends Service {
     }
 
     private void showOngoingNotification(String question) {
-        if (!callScreenVisible) {
-            startForeground(NOTIFICATION_ID, ongoingNotification(question));
-        }
+        // A started foreground service must remain foreground for the whole call. The ongoing
+        // call notification is intentionally non-clearable, like a regular phone/VoIP call.
+        startForeground(NOTIFICATION_ID, ongoingNotification(question));
     }
 
     private void restoreCallNotification() {
-        if (!active || callScreenVisible) return;
+        if (!active) return;
         String text = getSharedPreferences(SESSION, MODE_PRIVATE)
                 .getString("question", answered ? question()
                         : AppLanguage.ui(language, "Reminder call"));
@@ -774,16 +789,35 @@ public final class CallService extends Service {
     private void setCallScreenVisible(boolean visible) {
         if (!active) return;
         callScreenVisible = visible;
-        if (visible) {
-            stopForeground(STOP_FOREGROUND_REMOVE);
-            notifications.cancel(NOTIFICATION_ID);
-        } else {
-            String text = getSharedPreferences(SESSION, MODE_PRIVATE)
-                    .getString("question", answered ? question()
-                            : AppLanguage.ui(language, "Reminder call"));
-            startForeground(NOTIFICATION_ID,
-                    answered ? ongoingNotification(text) : incomingNotification());
+        String text = getSharedPreferences(SESSION, MODE_PRIVATE)
+                .getString("question", answered ? question()
+                        : AppLanguage.ui(language, "Reminder call"));
+        startForeground(NOTIFICATION_ID,
+                answered ? ongoingNotification(text) : incomingNotification());
+    }
+
+    private void enterRingForeground(Intent intent) {
+        if (!active) {
+            scheduleId = safe(intent.getStringExtra(ReminderScheduler.EXTRA_ID), "test-call");
+            phase = safe(intent.getStringExtra(ReminderScheduler.EXTRA_PHASE),
+                    ReminderScheduler.PHASE_MEDICINE);
+            label = safe(intent.getStringExtra("label"), "Reminder");
+            member = safe(intent.getStringExtra("member"), "Family member");
+            RemoteStore.Config config = new RemoteStore(this).load();
+            RemoteStore.Schedule schedule = ReminderScheduler.active(config, scheduleId, phase);
+            language = schedule == null
+                    ? (config == null ? AppLanguage.current(this)
+                            : AppLanguage.normalize(config.language))
+                    : AppLanguage.normalize(schedule.language);
         }
+        startForeground(NOTIFICATION_ID,
+                answered ? ongoingNotification(question()) : incomingNotification());
+    }
+
+    private void stopWithoutCall() {
+        processCallActive = false;
+        stopForeground(STOP_FOREGROUND_REMOVE);
+        stopSelf();
     }
 
     private void launchCallScreen() {
