@@ -23,6 +23,22 @@ public final class DailyCallStatusTest {
         assertEquals(0, next.get(Calendar.SECOND));
     }
 
+    @Test public void onlyReminderWithCarriedRetryKeepsPreviousDay() {
+        int yesterday = 2026265;
+        int today = 2026266;
+        long now = 1_000L;
+
+        assertEquals(yesterday, DailyCallStatus.selectDisplayDay(today, now,
+                new int[]{yesterday, -1, -1}, new long[]{2_000L, 0L, 0L}));
+        assertEquals(today, DailyCallStatus.selectDisplayDay(today, now,
+                new int[]{yesterday, -1, -1}, new long[]{0L, 0L, 0L}));
+    }
+
+    @Test public void expiredCarriedRetryReleasesPreviousDay() {
+        assertEquals(2026266, DailyCallStatus.selectDisplayDay(2026266, 3_000L,
+                new int[]{2026265}, new long[]{2_000L}));
+    }
+
     @Test public void activeCallWinsOverEveryOtherStatus() {
         assertEquals(DailyCallStatus.CALLING, DailyCallStatus.resolve(
                 true, 1_000L, true, true, true, true, true, 2_000L));

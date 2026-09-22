@@ -93,7 +93,7 @@ final class DailyCallStatus {
     void markIncomplete(String scheduleId) {
         long now = System.currentTimeMillis();
         write(scheduleId, ReminderScheduler.PHASE_MEDICINE, STATE_INCOMPLETE, 0L, now,
-                displayDay(now));
+                displayDay(scheduleId, now));
     }
 
     void markSkippedToday(String scheduleId) {
@@ -130,8 +130,8 @@ final class DailyCallStatus {
     }
 
     Display display(RemoteStore.Schedule schedule, long now) {
-        int displayDay = displayDay(now);
-        long referenceTime = referenceTime(displayDay, now);
+        int displayDay = displayDay(schedule.id, now);
+        long referenceTime = referenceTime(schedule.id, displayDay, now);
         Entry meal = schedule.preMinutes > 0
                 ? readForDay(schedule.id, ReminderScheduler.PHASE_MEAL, displayDay) : null;
         Entry primary = readForDay(schedule.id, ReminderScheduler.PHASE_MEDICINE, displayDay);
@@ -268,42 +268,46 @@ final class DailyCallStatus {
         return dayKey(now);
     }
 
-    private int displayDay(long now) {
+    private int displayDay(String scheduleId, long now) {
         int current = dayKey(now);
-        int heldDay = current;
+        String[] phases = {ReminderScheduler.PHASE_MEAL, ReminderScheduler.PHASE_MEDICINE,
+                ReminderScheduler.PHASE_CONFIRMATION};
+        int[] entryDays = {-1, -1, -1};
+        long[] holdUntils = {0L, 0L, 0L};
+        for (int index = 0; index < phases.length; index++) {
+            Entry entry = readRaw(scheduleId, phases[index]);
+            if (entry == null) continue;
+            entryDays[index] = entry.day;
+            holdUntils[index] = holdUntil(entry);
+        }
+        return selectDisplayDay(current, now, entryDays, holdUntils);
+    }
+
+    static int selectDisplayDay(int currentDay, long now, int[] entryDays, long[] holdUntils) {
+        int heldDay = currentDay;
         long latestHold = 0L;
-        for (Object raw : preferences.getAll().values()) {
-            if (!(raw instanceof String)) continue;
-            Entry entry = parse((String) raw);
-            if (entry == null || entry.day == current) continue;
-            long holdUntil = holdUntil(entry);
-            if (holdUntil > now && holdUntil > latestHold) {
-                latestHold = holdUntil;
-                heldDay = entry.day;
-            }
+        int count = Math.min(entryDays == null ? 0 : entryDays.length,
+                holdUntils == null ? 0 : holdUntils.length);
+        for (int index = 0; index < count; index++) {
+            if (entryDays[index] == currentDay || holdUntils[index] <= now
+                    || holdUntils[index] <= latestHold) continue;
+            latestHold = holdUntils[index];
+            heldDay = entryDays[index];
         }
         return heldDay;
     }
 
     long nextRolloverAt(long now) {
-        int current = dayKey(now);
         long midnight = nextLocalDayStart(now);
         long rollover = midnight;
-        boolean carriedDay = false;
         for (Object raw : preferences.getAll().values()) {
             if (!(raw instanceof String)) continue;
             Entry entry = parse((String) raw);
             if (entry == null) continue;
             long holdUntil = holdUntil(entry);
-            if (holdUntil <= now) continue;
-            if (entry.day != current) {
-                carriedDay = true;
-                rollover = Math.max(rollover == midnight ? 0L : rollover, holdUntil);
-            } else if (holdUntil > midnight) {
-                rollover = Math.max(rollover, holdUntil);
-            }
+            if (holdUntil > now) rollover = Math.min(rollover, holdUntil);
         }
-        return carriedDay ? Math.max(now + 1_000L, rollover) : rollover;
+        return Math.max(now + 1_000L, rollover);
     }
 
     private static Entry parse(String raw) {
@@ -328,16 +332,18 @@ final class DailyCallStatus {
         return 0L;
     }
 
-    private long referenceTime(int statusDay, long now) {
+    private long referenceTime(String scheduleId, int statusDay, long now) {
         if (statusDay == dayKey(now)) return now;
-        for (Object raw : preferences.getAll().values()) {
-            if (!(raw instanceof String)) continue;
-            Entry entry = parse((String) raw);
-            if (entry != null && entry.day == statusDay && entry.updatedAt > 0L) {
-                return entry.updatedAt;
+        long latestUpdate = 0L;
+        String[] phases = {ReminderScheduler.PHASE_MEAL, ReminderScheduler.PHASE_MEDICINE,
+                ReminderScheduler.PHASE_CONFIRMATION};
+        for (String phase : phases) {
+            Entry entry = readRaw(scheduleId, phase);
+            if (entry != null && entry.day == statusDay) {
+                latestUpdate = Math.max(latestUpdate, entry.updatedAt);
             }
         }
-        return now;
+        return latestUpdate > 0L ? latestUpdate : now;
     }
 
     private static boolean isCalling(Entry entry, long now) {
