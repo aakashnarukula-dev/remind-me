@@ -36,11 +36,15 @@ final class ReminderScheduler {
 
     static void scheduleAll(Context context, RemoteStore.Config config, long after) {
         if (config == null) return;
+        long now = System.currentTimeMillis();
+        DailyCallStatus statuses = new DailyCallStatus(context);
         for (RemoteStore.Schedule schedule : config.schedules) {
             if (!schedule.enabled) continue;
-            schedulePhase(context, schedule, PHASE_MEDICINE, after);
+            long scheduleAfter = schedulingFloor(after, now,
+                    statuses.isSkippedToday(schedule.id, now));
+            schedulePhase(context, schedule, PHASE_MEDICINE, scheduleAfter);
             if (!schedule.custom() && schedule.preMinutes > 0) {
-                schedulePhase(context, schedule, PHASE_MEAL, after);
+                schedulePhase(context, schedule, PHASE_MEAL, scheduleAfter);
             }
         }
     }
@@ -151,7 +155,11 @@ final class ReminderScheduler {
     static void scheduleNext(Context context, String id, String phase) {
         RemoteStore.Config config = new RemoteStore(context).load();
         RemoteStore.Schedule schedule = active(config, id, phase);
-        if (schedule != null) schedulePhase(context, schedule, phase, System.currentTimeMillis() + 60_000L);
+        if (schedule == null) return;
+        long now = System.currentTimeMillis();
+        long after = schedulingFloor(now + 60_000L, now,
+                new DailyCallStatus(context).isSkippedToday(id, now));
+        schedulePhase(context, schedule, phase, after);
     }
 
     static void scheduleRetry(Context context, String id, String phase) {
@@ -169,6 +177,10 @@ final class ReminderScheduler {
      */
     static void scheduleRetry(Context context, String id, String phase, String label,
             String member, int preMinutes) {
+        if (new DailyCallStatus(context).isSkippedToday(id, System.currentTimeMillis())) {
+            cancelRetry(context, id, phase);
+            return;
+        }
         long at = System.currentTimeMillis() + RETRY_DELAY_MS;
         saveRetry(context, id, phase, label, member, preMinutes, at);
         scheduleRetryAt(context, id, phase, label, member, preMinutes, at);
@@ -176,6 +188,10 @@ final class ReminderScheduler {
 
     static void scheduleRetryAfter(Context context, String id, String phase, String label,
             String member, int preMinutes, int delayMinutes) {
+        if (new DailyCallStatus(context).isSkippedToday(id, System.currentTimeMillis())) {
+            cancelRetry(context, id, phase);
+            return;
+        }
         long at = System.currentTimeMillis() + Math.max(1, delayMinutes) * 60_000L;
         saveRetry(context, id, phase, label, member, preMinutes, at);
         scheduleRetryAt(context, id, phase, label, member, preMinutes, at);
@@ -183,6 +199,10 @@ final class ReminderScheduler {
 
     static boolean scheduleRetryAtTime(Context context, String id, String phase, String label,
             String member, int preMinutes, long at) {
+        if (new DailyCallStatus(context).isSkippedToday(id, System.currentTimeMillis())) {
+            cancelRetry(context, id, phase);
+            return false;
+        }
         if (!isLaterToday(System.currentTimeMillis(), at)) return false;
         saveRetry(context, id, phase, label, member, preMinutes, at);
         scheduleRetryAt(context, id, phase, label, member, preMinutes, at);
@@ -198,6 +218,18 @@ final class ReminderScheduler {
         return current.get(Calendar.ERA) == selected.get(Calendar.ERA)
                 && current.get(Calendar.YEAR) == selected.get(Calendar.YEAR)
                 && current.get(Calendar.DAY_OF_YEAR) == selected.get(Calendar.DAY_OF_YEAR);
+    }
+
+    static long schedulingFloor(long requestedAfter, long now, boolean skippedToday) {
+        if (!skippedToday) return requestedAfter;
+        Calendar tomorrow = Calendar.getInstance();
+        tomorrow.setTimeInMillis(now);
+        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
+        tomorrow.set(Calendar.HOUR_OF_DAY, 0);
+        tomorrow.set(Calendar.MINUTE, 0);
+        tomorrow.set(Calendar.SECOND, 0);
+        tomorrow.set(Calendar.MILLISECOND, 0);
+        return Math.max(requestedAfter, tomorrow.getTimeInMillis());
     }
 
     static void scheduleConfirmation(Context context, String id) {
@@ -249,13 +281,8 @@ final class ReminderScheduler {
         RemoteStore.Config config = new RemoteStore(context).load();
         RemoteStore.Schedule schedule = active(config, id, PHASE_MEDICINE);
         if (schedule == null) return;
-        Calendar tomorrow = Calendar.getInstance();
-        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
-        tomorrow.set(Calendar.HOUR_OF_DAY, 0);
-        tomorrow.set(Calendar.MINUTE, 0);
-        tomorrow.set(Calendar.SECOND, 0);
-        tomorrow.set(Calendar.MILLISECOND, 0);
-        long after = tomorrow.getTimeInMillis();
+        long now = System.currentTimeMillis();
+        long after = schedulingFloor(now, now, true);
         schedulePhase(context, schedule, PHASE_MEDICINE, after);
         if (!schedule.custom() && schedule.preMinutes > 0) {
             schedulePhase(context, schedule, PHASE_MEAL, after);
@@ -273,6 +300,10 @@ final class ReminderScheduler {
                 JSONObject json = new JSONObject((String) entry.getValue());
                 String id = json.getString("id");
                 String phase = json.getString("phase");
+                if (new DailyCallStatus(context).isSkippedToday(id, now)) {
+                    cancelRetry(context, id, phase);
+                    continue;
+                }
                 RemoteStore.Config config = new RemoteStore(context).load();
                 RemoteStore.Schedule current = active(config, id, phase);
                 if (current == null) {

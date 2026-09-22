@@ -831,6 +831,11 @@ public final class MainActivity extends FragmentActivity {
         skipToday.setOnClickListener(v -> {
             dailyCallStatus.markSkippedToday(schedule.id);
             ReminderScheduler.skipRemainingToday(this, schedule.id);
+            if (CallService.isProcessCallActive(schedule.id)) {
+                startService(new Intent(this, CallService.class)
+                        .setAction(CallService.ACTION_SKIP_TODAY)
+                        .putExtra(ReminderScheduler.EXTRA_ID, schedule.id));
+            }
             dialog.dismiss();
             render();
         });

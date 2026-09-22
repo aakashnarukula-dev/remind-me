@@ -64,6 +64,7 @@ public final class CallService extends Service {
     private static final long ANSWER_TIMEOUT_MS = 60_000L;
     private static final long SPEECH_COMPLETION_TIMEOUT_MS = 60_000L;
     private static volatile boolean processCallActive;
+    private static volatile String processScheduleId;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable missedCall = () -> reject(true);
@@ -179,7 +180,10 @@ public final class CallService extends Service {
         else if (ACTION_DELAY_AT.equals(action)) chooseDelayAt(
                 intent.getLongExtra(EXTRA_DELAY_AT, -1L),
                 intent.getIntExtra(EXTRA_OPTION_STEP, -1));
-        else if (ACTION_SKIP_TODAY.equals(action)) skipToday();
+        else if (ACTION_SKIP_TODAY.equals(action)) {
+            String requestedId = intent.getStringExtra(ReminderScheduler.EXTRA_ID);
+            if (requestedId == null || requestedId.equals(scheduleId)) skipToday();
+        }
         else if (ACTION_END.equals(action)) reject(false);
         else if (ACTION_SILENCE.equals(action)) silenceRinging();
         else if (ACTION_RESTORE_NOTIFICATION.equals(action)) restoreCallNotification();
@@ -239,6 +243,7 @@ public final class CallService extends Service {
         }
         active = true;
         processCallActive = true;
+        processScheduleId = scheduleId;
         answered = false;
         speakerOn = false;
         finalizing = false;
@@ -441,7 +446,7 @@ public final class CallService extends Service {
     }
 
     private void skipToday() {
-        if (!active || !answered || finalizing) return;
+        if (!active) return;
         handler.removeCallbacks(unansweredQuestion);
         if (!"test-call".equals(scheduleId)) {
             new DailyCallStatus(this).markSkippedToday(scheduleId);
@@ -463,6 +468,7 @@ public final class CallService extends Service {
         if (!active) return;
         active = false;
         processCallActive = false;
+        processScheduleId = null;
         answered = false;
         connectedAtMillis = 0L;
         activeSchedule = null;
@@ -816,6 +822,7 @@ public final class CallService extends Service {
 
     private void stopWithoutCall() {
         processCallActive = false;
+        processScheduleId = null;
         stopForeground(STOP_FOREGROUND_REMOVE);
         stopSelf();
     }
@@ -1079,6 +1086,10 @@ public final class CallService extends Service {
 
     static boolean isProcessCallActive() { return processCallActive; }
 
+    static boolean isProcessCallActive(String scheduleId) {
+        return processCallActive && scheduleId != null && scheduleId.equals(processScheduleId);
+    }
+
     @Override public void onTaskRemoved(Intent rootIntent) {
         if (active && !finalizing) reject(true);
         super.onTaskRemoved(rootIntent);
@@ -1086,6 +1097,7 @@ public final class CallService extends Service {
 
     @Override public void onDestroy() {
         processCallActive = false;
+        processScheduleId = null;
         if (active && !finalizing && !"test-call".equals(scheduleId)) {
             ReminderScheduler.scheduleRetry(this, scheduleId, phase,
                     label, member, preMinutes);
