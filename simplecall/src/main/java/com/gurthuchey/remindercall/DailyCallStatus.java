@@ -97,9 +97,19 @@ final class DailyCallStatus {
     }
 
     void markSkippedToday(String scheduleId) {
+        markSkippedOccurrence(scheduleId, ReminderScheduler.PHASE_MEDICINE);
+    }
+
+    void markSkippedOccurrence(String scheduleId, String occurrencePhase) {
         long now = System.currentTimeMillis();
         write(scheduleId, ReminderScheduler.PHASE_MEDICINE, STATE_SKIPPED, 0L, now,
-                occurrenceDay(scheduleId, ReminderScheduler.PHASE_MEDICINE, now));
+                occurrenceDay(scheduleId, occurrencePhase, now));
+    }
+
+    boolean isCarriedOccurrence(String scheduleId, String phase, long now) {
+        Entry entry = readRaw(scheduleId, phase);
+        return entry != null && entry.day != dayKey(now)
+                && (STATE_RETRY.equals(entry.state) || STATE_RINGING.equals(entry.state));
     }
 
     boolean isSkippedToday(String scheduleId, long now) {

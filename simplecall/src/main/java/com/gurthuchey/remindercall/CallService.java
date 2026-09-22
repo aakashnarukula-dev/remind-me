@@ -299,6 +299,17 @@ public final class CallService extends Service {
             handler.postDelayed(this::finishCall, SPEECH_COMPLETION_TIMEOUT_MS);
             return;
         }
+        if (informationOnlyQuestion(activeSchedule, step)) {
+            handler.removeCallbacks(unansweredQuestion);
+            int followingStep = step + 1;
+            String speechId = followingStep >= activeSchedule.questions.size()
+                    ? "info_finish" : "info_continue_" + followingStep;
+            // The built-in Remind me later action remains usable while this message speaks.
+            // If it is untouched, an information-only question advances or ends automatically.
+            speak(question(), speechId);
+            handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS + 30_000L);
+            return;
+        }
         handler.removeCallbacks(unansweredQuestion);
         // Safety watchdog for a broken TTS engine or corrupt cached clip. Normally this is
         // replaced by a fresh full-minute timeout as soon as the spoken question completes.
@@ -450,8 +461,12 @@ public final class CallService extends Service {
         if (!active) return;
         handler.removeCallbacks(unansweredQuestion);
         if (!"test-call".equals(scheduleId)) {
-            new DailyCallStatus(this).markSkippedToday(scheduleId);
-            ReminderScheduler.skipRemainingToday(this, scheduleId);
+            DailyCallStatus statuses = new DailyCallStatus(this);
+            boolean carriedFromPreviousDay = statuses.isCarriedOccurrence(
+                    scheduleId, phase, System.currentTimeMillis());
+            statuses.markSkippedOccurrence(scheduleId, phase);
+            ReminderScheduler.skipRemainingOccurrence(this, scheduleId,
+                    carriedFromPreviousDay);
         }
         finishCall();
     }
@@ -611,6 +626,20 @@ public final class CallService extends Service {
     private void onSpeechFinished(String id) {
         if ("finish".equals(id)) {
             finishCall();
+        } else if ("info_finish".equals(id)
+                && active && answered && !finalizing) {
+            handler.removeCallbacks(unansweredQuestion);
+            markCurrentCompleted();
+            scheduleConfirmationAfterPrimary();
+            finishCall();
+        } else if (id != null && id.startsWith("info_continue_")
+                && active && answered && !finalizing) {
+            handler.removeCallbacks(unansweredQuestion);
+            try {
+                announceQuestion(Integer.parseInt(id.substring("info_continue_".length())));
+            } catch (NumberFormatException ignored) {
+                reject(true);
+            }
         } else if (id != null && id.startsWith("continue_")
                 && active && answered && !finalizing) {
             handler.removeCallbacks(unansweredQuestion);
@@ -1033,6 +1062,12 @@ public final class CallService extends Service {
     private int customAnswerCount() {
         if (!customCall() || step < 0 || step >= activeSchedule.questions.size()) return 0;
         return activeSchedule.questions.get(step).answers.size();
+    }
+
+    static boolean informationOnlyQuestion(RemoteStore.Schedule schedule, int questionIndex) {
+        return schedule != null && schedule.scripted() && questionIndex >= 0
+                && questionIndex < schedule.questions.size()
+                && schedule.questions.get(questionIndex).answers.isEmpty();
     }
 
     private boolean customCall() {

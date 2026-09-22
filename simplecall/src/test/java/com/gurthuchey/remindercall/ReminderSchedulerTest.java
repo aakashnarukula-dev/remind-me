@@ -59,6 +59,17 @@ public final class ReminderSchedulerTest {
                 requested.getTimeInMillis(), now.getTimeInMillis(), false));
     }
 
+    @Test public void skippingCarriedRetryDoesNotSuppressCurrentDaysNormalReminder() {
+        Calendar now = Calendar.getInstance();
+        now.set(2026, Calendar.SEPTEMBER, 23, 1, 0, 0);
+        now.set(Calendar.MILLISECOND, 0);
+
+        assertEquals(now.getTimeInMillis() + 60_000L,
+                ReminderScheduler.skipScheduleAfter(now.getTimeInMillis(), true));
+        assertEquals(DailyCallStatus.nextLocalDayStart(now.getTimeInMillis()),
+                ReminderScheduler.skipScheduleAfter(now.getTimeInMillis(), false));
+    }
+
     @Test public void legacyOneMinuteRetryMigratesToFiveMinutesFromUpdate() {
         long now = 1_000_000L;
         assertEquals(now + 5L * 60_000L,

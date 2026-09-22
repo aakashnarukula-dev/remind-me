@@ -288,6 +288,15 @@ final class ReminderScheduler {
 
     /** Cancels every remaining occurrence today, then restores the normal recurring schedule. */
     static void skipRemainingToday(Context context, String id) {
+        skipRemainingOccurrence(context, id, false);
+    }
+
+    /**
+     * Cancels the active occurrence and restores the normal recurring schedule. A retry carried
+     * past midnight belongs to yesterday, so skipping it must not suppress today's later call.
+     */
+    static void skipRemainingOccurrence(Context context, String id,
+            boolean carriedFromPreviousDay) {
         if (id == null || id.trim().isEmpty() || "test-call".equals(id)) return;
         cancelRetry(context, id, PHASE_MEDICINE);
         cancelRetry(context, id, PHASE_MEAL);
@@ -301,11 +310,15 @@ final class ReminderScheduler {
         RemoteStore.Schedule schedule = active(config, id, PHASE_MEDICINE);
         if (schedule == null) return;
         long now = System.currentTimeMillis();
-        long after = schedulingFloor(now, now, true);
+        long after = skipScheduleAfter(now, carriedFromPreviousDay);
         schedulePhase(context, schedule, PHASE_MEDICINE, after);
         if (!schedule.custom() && schedule.preMinutes > 0) {
             schedulePhase(context, schedule, PHASE_MEAL, after);
         }
+    }
+
+    static long skipScheduleAfter(long now, boolean carriedFromPreviousDay) {
+        return carriedFromPreviousDay ? now + 60_000L : DailyCallStatus.nextLocalDayStart(now);
     }
 
     /** Restores unanswered-call retries after a reboot or app update. */
