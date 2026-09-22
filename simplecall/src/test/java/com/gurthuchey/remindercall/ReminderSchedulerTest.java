@@ -42,6 +42,24 @@ public final class ReminderSchedulerTest {
                 now.getTimeInMillis(), tomorrow.getTimeInMillis()));
     }
 
+    @Test public void skippedReminderCannotBeRescheduledAgainToday() {
+        Calendar now = Calendar.getInstance();
+        now.set(2026, Calendar.SEPTEMBER, 22, 10, 15, 0);
+        now.set(Calendar.MILLISECOND, 0);
+        Calendar requested = (Calendar) now.clone();
+        requested.set(Calendar.HOUR_OF_DAY, 17);
+
+        Calendar floor = Calendar.getInstance();
+        floor.setTimeInMillis(ReminderScheduler.schedulingFloor(
+                requested.getTimeInMillis(), now.getTimeInMillis(), true));
+
+        assertEquals(23, floor.get(Calendar.DAY_OF_MONTH));
+        assertEquals(0, floor.get(Calendar.HOUR_OF_DAY));
+        assertEquals(0, floor.get(Calendar.MINUTE));
+        assertEquals(requested.getTimeInMillis(), ReminderScheduler.schedulingFloor(
+                requested.getTimeInMillis(), now.getTimeInMillis(), false));
+    }
+
     @Test public void legacyOneMinuteRetryMigratesToFiveMinutesFromUpdate() {
         long now = 1_000_000L;
         assertEquals(now + 5L * 60_000L,
