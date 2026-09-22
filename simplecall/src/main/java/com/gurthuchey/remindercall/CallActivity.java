@@ -523,40 +523,26 @@ public final class CallActivity extends android.app.Activity {
         Calendar now = Calendar.getInstance();
         Calendar suggested = (Calendar) now.clone();
         suggested.add(Calendar.MINUTE, 5);
-        if (suggested.get(Calendar.DAY_OF_YEAR) != now.get(Calendar.DAY_OF_YEAR)
-                || suggested.get(Calendar.YEAR) != now.get(Calendar.YEAR)) {
-            suggested = (Calendar) now.clone();
-            suggested.set(Calendar.HOUR_OF_DAY, 23);
-            suggested.set(Calendar.MINUTE, 59);
-        }
         suggested.set(Calendar.SECOND, 0);
         suggested.set(Calendar.MILLISECOND, 0);
-        if (suggested.getTimeInMillis() <= now.getTimeInMillis()) {
-            Toast.makeText(this, AppLanguage.ui(callLanguage(),
-                    "Choose a time later today."), Toast.LENGTH_SHORT).show();
-            return;
-        }
 
         new TimePickerDialog(this, (picker, hour, minute) -> {
-            Calendar selected = Calendar.getInstance();
-            selected.set(Calendar.HOUR_OF_DAY, hour);
-            selected.set(Calendar.MINUTE, minute);
-            selected.set(Calendar.SECOND, 0);
-            selected.set(Calendar.MILLISECOND, 0);
-            if (!ReminderScheduler.isLaterToday(
-                    System.currentTimeMillis(), selected.getTimeInMillis())) {
+            long selectedAt = ReminderScheduler.selectedDelayAt(
+                    System.currentTimeMillis(), hour, minute);
+            if (!ReminderScheduler.isAllowedDelayTime(
+                    System.currentTimeMillis(), selectedAt)) {
                 Toast.makeText(this, AppLanguage.ui(callLanguage(),
-                        "Choose a time later today."), Toast.LENGTH_SHORT).show();
+                        "Choose a future time within 24 hours."), Toast.LENGTH_SHORT).show();
                 return;
             }
             optionSubmitting = true;
             button.setText(android.text.format.DateFormat.getTimeFormat(this)
-                    .format(selected.getTime()));
+                    .format(new java.util.Date(selectedAt)));
             button.setTextColor(Color.WHITE);
             button.setBackground(Ui.actionBackground(this, Ui.ACCEPT, 18));
             button.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
             button.postDelayed(() -> dispatchDelayAt(
-                    selected.getTimeInMillis(), expectedStep), 140L);
+                    selectedAt, expectedStep), 140L);
         }, suggested.get(Calendar.HOUR_OF_DAY), suggested.get(Calendar.MINUTE),
                 android.text.format.DateFormat.is24HourFormat(this)).show();
     }

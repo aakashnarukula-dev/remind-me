@@ -29,6 +29,8 @@ public final class SpeechTextTest {
                 SpeechText.reminderDelayed(5));
         assertEquals("Okay. I’ll call again at 5:45 PM today to remind you. Bye!",
                 SpeechText.reminderDelayedUntil("5:45 PM", "en"));
+        assertEquals("Okay. I’ll call again tomorrow at 1:00 AM to remind you. Bye!",
+                SpeechText.reminderDelayedUntil("1:00 AM", true, "en"));
         assertEquals(SpeechText.reminderDelayed(5),
                 VoiceClipCache.BUNDLED_FIVE_MINUTE_RESPONSE_TEXT);
         assertEquals("హలో Aakash! భోజనం చేశారా? ఇంకా చేయకపోతే ఇప్పుడే చేయండి. "

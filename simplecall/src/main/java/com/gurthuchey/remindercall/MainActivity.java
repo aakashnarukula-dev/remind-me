@@ -18,6 +18,8 @@ import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.os.PowerManager;
 import android.provider.Settings;
 import android.text.Editable;
@@ -86,6 +88,12 @@ public final class MainActivity extends FragmentActivity {
     private boolean statusListenerRegistered;
     private ScrollView mainScroll;
     private RemoteStore.Config optimisticConfig;
+    private final Handler dayRolloverHandler = new Handler(Looper.getMainLooper());
+    private final Runnable dayRollover = () -> {
+        ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
+        render();
+        scheduleDayRollover();
+    };
     private final SharedPreferences.OnSharedPreferenceChangeListener scheduleListener =
             (preferences, key) -> {
                 if (key == null || "config".equals(key)) {
@@ -94,7 +102,10 @@ public final class MainActivity extends FragmentActivity {
                 }
             };
     private final SharedPreferences.OnSharedPreferenceChangeListener statusListener =
-            (preferences, key) -> runOnUiThread(this::render);
+            (preferences, key) -> runOnUiThread(() -> {
+                render();
+                scheduleDayRollover();
+            });
 
     private void applyLightSystemBars(Window window) {
         View decor = window.getDecorView();
@@ -133,10 +144,16 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        scheduleDayRollover();
         if (sync != null) {
             ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
             render();
         }
+    }
+
+    @Override protected void onPause() {
+        dayRolloverHandler.removeCallbacks(dayRollover);
+        super.onPause();
     }
 
     @Override protected void onStart() {
@@ -160,9 +177,19 @@ public final class MainActivity extends FragmentActivity {
     }
 
     @Override protected void onDestroy() {
+        dayRolloverHandler.removeCallbacks(dayRollover);
         if (sync != null) sync.stop();
         if (phoneLogin != null) phoneLogin.clear();
         super.onDestroy();
+    }
+
+    private void scheduleDayRollover() {
+        dayRolloverHandler.removeCallbacks(dayRollover);
+        long now = System.currentTimeMillis();
+        DailyCallStatus statuses = dailyCallStatus == null
+                ? new DailyCallStatus(this) : dailyCallStatus;
+        long delay = Math.max(1_000L, statuses.nextRolloverAt(now) - now + 1_000L);
+        dayRolloverHandler.postDelayed(dayRollover, delay);
     }
 
     private void render() {

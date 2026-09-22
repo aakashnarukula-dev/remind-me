@@ -4,7 +4,25 @@ import static org.junit.Assert.assertEquals;
 
 import org.junit.Test;
 
+import java.util.Calendar;
+
 public final class DailyCallStatusTest {
+    @Test public void dailyStatusesRollOverAtLocalMidnight() {
+        Calendar now = Calendar.getInstance();
+        now.set(2026, Calendar.SEPTEMBER, 22, 23, 59, 30);
+        now.set(Calendar.MILLISECOND, 0);
+
+        Calendar next = Calendar.getInstance();
+        next.setTimeInMillis(DailyCallStatus.nextLocalDayStart(now.getTimeInMillis()));
+
+        assertEquals(2026, next.get(Calendar.YEAR));
+        assertEquals(Calendar.SEPTEMBER, next.get(Calendar.MONTH));
+        assertEquals(23, next.get(Calendar.DAY_OF_MONTH));
+        assertEquals(0, next.get(Calendar.HOUR_OF_DAY));
+        assertEquals(0, next.get(Calendar.MINUTE));
+        assertEquals(0, next.get(Calendar.SECOND));
+    }
+
     @Test public void activeCallWinsOverEveryOtherStatus() {
         assertEquals(DailyCallStatus.CALLING, DailyCallStatus.resolve(
                 true, 1_000L, true, true, true, true, true, 2_000L));

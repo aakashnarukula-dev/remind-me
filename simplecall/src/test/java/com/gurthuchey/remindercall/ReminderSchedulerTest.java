@@ -22,24 +22,23 @@ public final class ReminderSchedulerTest {
         assertArrayEquals(new int[]{5, 15, 30, 60}, CallService.DELAY_MINUTES);
     }
 
-    @Test public void customRetryTimeMustBeLaterOnTheSameDay() {
+    @Test public void customRetryTimeCanCrossMidnightButStaysWithinTwentyFourHours() {
         Calendar now = Calendar.getInstance();
-        now.set(2026, Calendar.SEPTEMBER, 21, 14, 0, 0);
+        now.set(2026, Calendar.SEPTEMBER, 21, 23, 35, 0);
         now.set(Calendar.MILLISECOND, 0);
-        Calendar later = (Calendar) now.clone();
-        later.set(Calendar.HOUR_OF_DAY, 17);
-        later.set(Calendar.MINUTE, 45);
-        Calendar earlier = (Calendar) now.clone();
-        earlier.set(Calendar.HOUR_OF_DAY, 13);
-        Calendar tomorrow = (Calendar) later.clone();
-        tomorrow.add(Calendar.DAY_OF_YEAR, 1);
+        long selected = ReminderScheduler.selectedDelayAt(
+                now.getTimeInMillis(), 1, 0);
+        Calendar tomorrow = Calendar.getInstance();
+        tomorrow.setTimeInMillis(selected);
 
-        assertTrue(ReminderScheduler.isLaterToday(
-                now.getTimeInMillis(), later.getTimeInMillis()));
-        assertFalse(ReminderScheduler.isLaterToday(
-                now.getTimeInMillis(), earlier.getTimeInMillis()));
-        assertFalse(ReminderScheduler.isLaterToday(
-                now.getTimeInMillis(), tomorrow.getTimeInMillis()));
+        assertEquals(22, tomorrow.get(Calendar.DAY_OF_MONTH));
+        assertEquals(1, tomorrow.get(Calendar.HOUR_OF_DAY));
+        assertTrue(ReminderScheduler.isAllowedDelayTime(now.getTimeInMillis(), selected));
+        assertFalse(ReminderScheduler.isSameLocalDay(now.getTimeInMillis(), selected));
+        assertFalse(ReminderScheduler.isAllowedDelayTime(now.getTimeInMillis(),
+                now.getTimeInMillis() - 1L));
+        assertFalse(ReminderScheduler.isAllowedDelayTime(now.getTimeInMillis(),
+                now.getTimeInMillis() + 24L * 60L * 60_000L + 1L));
     }
 
     @Test public void skippedReminderCannotBeRescheduledAgainToday() {
