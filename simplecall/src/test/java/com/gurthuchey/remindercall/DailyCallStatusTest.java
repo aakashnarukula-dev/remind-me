@@ -136,4 +136,38 @@ public final class DailyCallStatusTest {
         assertEquals("ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", DailyCallStatus.skippedLabel("kn"));
         assertEquals("ഒഴിവാക്കി", DailyCallStatus.skippedLabel("ml"));
     }
+
+    @Test public void legacyAfterMidnightSkipIsClearedOnceAfterUpgrade() {
+        Calendar updated = Calendar.getInstance();
+        updated.set(2026, Calendar.SEPTEMBER, 23, 0, 20, 0);
+        updated.set(Calendar.MILLISECOND, 0);
+        Calendar installed = (Calendar) updated.clone();
+        installed.add(Calendar.MINUTE, 50);
+        Calendar now = (Calendar) updated.clone();
+        now.add(Calendar.MINUTE, 55);
+        int day = updated.get(Calendar.YEAR) * 1000 + updated.get(Calendar.DAY_OF_YEAR);
+
+        org.junit.Assert.assertTrue(DailyCallStatus.shouldClearLegacyAfterMidnightSkip(
+                day, true, updated.getTimeInMillis(), now.getTimeInMillis(),
+                installed.getTimeInMillis()));
+    }
+
+    @Test public void currentAndDaytimeSkipsAreNeverTreatedAsLegacyCarry() {
+        Calendar updated = Calendar.getInstance();
+        updated.set(2026, Calendar.SEPTEMBER, 23, 10, 20, 0);
+        updated.set(Calendar.MILLISECOND, 0);
+        Calendar later = (Calendar) updated.clone();
+        later.add(Calendar.HOUR, 1);
+        int day = updated.get(Calendar.YEAR) * 1000 + updated.get(Calendar.DAY_OF_YEAR);
+
+        org.junit.Assert.assertFalse(DailyCallStatus.shouldClearLegacyAfterMidnightSkip(
+                day, true, updated.getTimeInMillis(), later.getTimeInMillis(),
+                later.getTimeInMillis()));
+        org.junit.Assert.assertFalse(DailyCallStatus.shouldClearLegacyAfterMidnightSkip(
+                day, false, updated.getTimeInMillis(), later.getTimeInMillis(),
+                later.getTimeInMillis()));
+        org.junit.Assert.assertFalse(DailyCallStatus.shouldClearLegacyAfterMidnightSkip(
+                day, true, updated.getTimeInMillis(), later.getTimeInMillis(),
+                updated.getTimeInMillis()));
+    }
 }

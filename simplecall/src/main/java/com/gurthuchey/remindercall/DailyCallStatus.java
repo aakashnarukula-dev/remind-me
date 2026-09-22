@@ -24,6 +24,8 @@ final class DailyCallStatus {
 
     private static final String PREFS = "daily_call_status";
     private static final String TRACKING_STARTED_AT = "tracking_started_at";
+    private static final String MIGRATED_AFTER_MIDNIGHT_SKIPS =
+            "migrated_after_midnight_skips_v1";
     private static final String STATE_RINGING = "ringing";
     private static final String STATE_RETRY = "retry";
     private static final String STATE_COMPLETED = "completed";
@@ -70,6 +72,7 @@ final class DailyCallStatus {
             preferences.edit().putLong(TRACKING_STARTED_AT, savedStart).commit();
         }
         trackingStartedAt = savedStart;
+        migrateLegacyAfterMidnightSkips();
     }
 
     void markCalling(String scheduleId, String phase) {
@@ -257,6 +260,47 @@ final class DailyCallStatus {
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    /**
+     * Builds before occurrence-day tracking could save a late retry resolved after midnight as
+     * belonging to the new day. Remove only those legacy, after-midnight skip records once. New
+     * calls preserve their originating day through ringing, retry and terminal states.
+     */
+    private void migrateLegacyAfterMidnightSkips() {
+        if (preferences.getBoolean(MIGRATED_AFTER_MIDNIGHT_SKIPS, false)) return;
+        long now = System.currentTimeMillis();
+        long updatedBefore = packageLastUpdateTime();
+        SharedPreferences.Editor editor = preferences.edit();
+        for (java.util.Map.Entry<String, ?> item : preferences.getAll().entrySet()) {
+            if (!(item.getValue() instanceof String) || !item.getKey().startsWith("status:")) {
+                continue;
+            }
+            Entry entry = parse((String) item.getValue());
+            if (entry != null && shouldClearLegacyAfterMidnightSkip(entry.day,
+                    STATE_SKIPPED.equals(entry.state), entry.updatedAt, now, updatedBefore)) {
+                editor.remove(item.getKey());
+            }
+        }
+        editor.putBoolean(MIGRATED_AFTER_MIDNIGHT_SKIPS, true).commit();
+    }
+
+    private long packageLastUpdateTime() {
+        try {
+            return context.getPackageManager().getPackageInfo(context.getPackageName(), 0)
+                    .lastUpdateTime;
+        } catch (Exception ignored) {
+            return System.currentTimeMillis();
+        }
+    }
+
+    static boolean shouldClearLegacyAfterMidnightSkip(int entryDay, boolean skipped,
+            long updatedAt, long now, long updatedBefore) {
+        if (!skipped || updatedAt <= 0L || updatedAt >= updatedBefore
+                || entryDay != dayKey(now) || dayKey(updatedAt) != entryDay) return false;
+        Calendar updated = Calendar.getInstance();
+        updated.setTimeInMillis(updatedAt);
+        return updated.get(Calendar.HOUR_OF_DAY) < 4;
     }
 
     private int occurrenceDay(String scheduleId, String phase, long now) {
