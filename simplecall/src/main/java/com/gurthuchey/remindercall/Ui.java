@@ -22,6 +22,8 @@ import android.view.WindowInsets;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import com.gurthuchey.remindercall.R;
+
 final class Ui {
     static final int BG = Color.rgb(246, 245, 251);
     static final int RAISED = Color.rgb(238, 234, 248);
@@ -52,12 +54,19 @@ final class Ui {
     static TextView text(Context context, String value, float size, int color, boolean bold) {
         TextView view = new TextView(context);
         view.setText(AppLanguage.ui(context, value));
-        view.setTextSize(size);
+        typography(view, size, bold);
         view.setTextColor(color);
         view.setGravity(Gravity.CENTER_VERTICAL);
-        view.setTypeface(Typeface.create(bold ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
         view.setLineSpacing(0, 1.12f);
         return view;
+    }
+
+    static void typography(TextView view, float size, boolean bold) {
+        view.setTextSize(size);
+        view.setTypeface(Typeface.create(view.getResources().getFont(R.font.poppins),
+                bold ? Typeface.BOLD : Typeface.NORMAL));
+        float scaledDensity = view.getResources().getDisplayMetrics().scaledDensity;
+        view.setLetterSpacing(-0.2f / (size * scaledDensity));
     }
 
     static GradientDrawable rounded(int color, int radiusDp, Context context) {

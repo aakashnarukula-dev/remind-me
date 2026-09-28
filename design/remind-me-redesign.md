@@ -6,7 +6,7 @@ Home contains a header and reminder list. The header keeps branding, Add reminde
 ## Tokens
 Cloud `#F6F5FB`, paper `#FFFFFF`, ink `#27243D`, iris `#6652CC`, lilac `#EAE5FC`, sage `#277566`, rose `#A74760`.
 
-System sans-serif supports all six app languages. Reminder titles use 15sp; times use condensed 14sp numerals with AM/PM on the same line, fitting down when text size increases. Rows start at 66dp and grow only for long names. Weekday schedules appear in the editor, not below reminder rows. Status tags retain 40dp touch height; header actions are 44dp.
+Poppins supports all six app languages. Every app text style uses `-0.2px` letter spacing. Reminder titles use 15sp; times use 14sp numerals with AM/PM on the same line, fitting down when text size increases. Rows start at 66dp and grow only for long names. Weekday schedules appear in the editor, not below reminder rows. Status tags retain 40dp touch height; header actions are 44dp.
 
 ## Timeline behavior
 A single rail is drawn behind all rows and period headings. Period labels sit in the left time gutter; reminder content stays to the right. Row-center dots define reminder times. Elapsed time fills the rail in iris; future time remains gray. Between reminder times, the fill interpolates between their row centers, including any intervening section headings. The rail updates on minute boundaries, without rebuilding or scrolling the list.

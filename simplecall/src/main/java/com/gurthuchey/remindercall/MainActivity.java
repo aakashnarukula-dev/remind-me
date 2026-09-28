@@ -12,7 +12,6 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
 import android.graphics.Color;
-import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -302,7 +301,7 @@ public final class MainActivity extends FragmentActivity {
                 Button language = button(AppLanguage.NAMES[index],
                         AppLanguage.CODES[index].equals(selected) ? Ui.GOLD : Ui.RAISED,
                         Ui.INK);
-                language.setTextSize(12);
+                Ui.typography(language, 12, true);
                 final String code = AppLanguage.CODES[index];
                 language.setOnClickListener(v -> {
                     AppLanguage.set(this, code);
@@ -321,7 +320,7 @@ public final class MainActivity extends FragmentActivity {
         }
 
         Button logout = button("Log out", Ui.RAISED, Ui.DANGER);
-        logout.setTextSize(12);
+        Ui.typography(logout, 12, true);
         logout.setOnClickListener(v -> {
             popup.dismiss();
             signOutUser();
@@ -419,7 +418,7 @@ public final class MainActivity extends FragmentActivity {
             phoneInput.setSingleLine(true);
             phoneInput.setTextColor(Ui.INK);
             phoneInput.setHintTextColor(Ui.MUTED);
-            phoneInput.setTextSize(17);
+            Ui.typography(phoneInput, 17, false);
             phoneInput.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
             phoneInput.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 14, Ui.LINE, 1, this));
             phoneInput.setHint("10-digit mobile number");
@@ -447,7 +446,7 @@ public final class MainActivity extends FragmentActivity {
                 otpInput.setSingleLine(true);
                 otpInput.setTextColor(Ui.INK);
                 otpInput.setHintTextColor(Ui.MUTED);
-                otpInput.setTextSize(17);
+                Ui.typography(otpInput, 17, false);
                 otpInput.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
                 otpInput.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 14, Ui.LINE, 1, this));
                 otpInput.setHint("6-digit OTP");
@@ -470,7 +469,7 @@ public final class MainActivity extends FragmentActivity {
             Button action = button(authBusy ? "Please wait…" : otpSent ? "Resend OTP" : "Send OTP",
                     otpSent ? Ui.RAISED2 : Ui.PRIMARY, Ui.INK);
             action.setEnabled(!authBusy);
-            action.setTextSize(otpSent ? 13 : 16);
+            Ui.typography(action, otpSent ? 13 : 16, true);
             action.setOnClickListener(v -> {
                 authBusy = true;
                 loginMessage = "";
@@ -610,7 +609,7 @@ public final class MainActivity extends FragmentActivity {
         EditText code = new EditText(this);
         code.setHint("6-digit code");
         code.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
-        code.setTextSize(24);
+        Ui.typography(code, 24, false);
         code.setTextColor(Ui.INK);
         code.setHintTextColor(Ui.MUTED);
         code.setGravity(Gravity.CENTER);
@@ -680,7 +679,7 @@ public final class MainActivity extends FragmentActivity {
             boolean clock24 = android.text.format.DateFormat.is24HourFormat(this);
             TextView hour = Ui.text(this, new java.text.SimpleDateFormat(clock24 ? "HH:mm" : "h:mm a",
                     AppLanguage.locale(currentLanguage())).format(time.getTime()).toUpperCase(Locale.ROOT), 14, notToday ? Ui.MUTED : Ui.INK, true);
-            hour.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+            Ui.typography(hour, 14, true);
             hour.setSingleLine(true);
             hour.setAutoSizeTextTypeUniformWithConfiguration(10, 14, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             when.addView(hour);
@@ -931,7 +930,7 @@ public final class MainActivity extends FragmentActivity {
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         if (existing != null) {
             Button delete = button("Delete", Ui.RAISED2, Ui.DANGER);
-            delete.setTextSize(13);
+            Ui.typography(delete, 13, true);
             delete.setSingleLine(true);
             delete.setMinWidth(0);
             delete.setMinimumWidth(0);
@@ -1019,8 +1018,7 @@ public final class MainActivity extends FragmentActivity {
         medicine.setText("medicine".equals(draft.category)
                 ? normalizeMedicineName(draft.label) : draft.label);
         medicine.setSingleLine(true);
-        medicine.setTextSize(14);
-        medicine.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        Ui.typography(medicine, 14, true);
         medicine.setTextColor(Ui.INK);
         medicine.setHintTextColor(Ui.MUTED);
         medicine.setFilters(new InputFilter[]{new InputFilter.LengthFilter(80)});
@@ -1038,8 +1036,7 @@ public final class MainActivity extends FragmentActivity {
                 0, 10, 0, 4));
         int[] selectedTime = {draft.hour, draft.minute};
         Button time = button(timeText(draft), Ui.RAISED2, Ui.INK);
-        time.setTextSize(14);
-        time.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        Ui.typography(time, 14, true);
         time.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 14, Ui.LINE, 1, this));
         time.setElevation(0);
         time.setTranslationZ(0);
@@ -1330,7 +1327,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void styleCategoryOption(TextView view, int position, boolean dropDown) {
         view.setText(categoryNames()[position]);
-        view.setTextSize(17);
+        Ui.typography(view, 17, false);
         view.setTextColor(Ui.INK);
         view.setGravity(Gravity.CENTER_VERTICAL);
         view.setMinHeight(Ui.dp(this, 52));
@@ -1713,7 +1710,7 @@ public final class MainActivity extends FragmentActivity {
         input.setHint(hint);
         input.setTextColor(Ui.INK);
         input.setHintTextColor(Ui.MUTED);
-        input.setTextSize(15);
+        Ui.typography(input, 15, false);
         input.setSingleLine(singleLine);
         input.setGravity(singleLine ? Gravity.CENTER_VERTICAL : Gravity.TOP);
         input.setFilters(new InputFilter[]{new InputFilter.LengthFilter(maximum)});
@@ -1807,10 +1804,9 @@ public final class MainActivity extends FragmentActivity {
     private Button button(String label, int background, int foreground) {
         Button button = new Button(this);
         button.setText(AppLanguage.ui(this, label));
-        button.setTextSize(13);
+        Ui.typography(button, 13, true);
         button.setTextColor(background == Ui.ACCENT ? Ui.WHITE : foreground);
         button.setAllCaps(false);
-        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         button.setStateListAnimator(null);
         button.setElevation(0);
         button.setGravity(Gravity.CENTER);

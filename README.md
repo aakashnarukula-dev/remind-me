@@ -5,7 +5,7 @@ Two lightweight native Android apps for private family reminder calls:
 - `com.gurthuchey.admin` (`Admin`) manages every family member and reminder.
 - `com.gurthuchey.app` (`గుర్తు చేయి`) shows and edits only the signed-in member's reminders and runs the calls.
 
-The member app uses a compact iris-purple reminder timeline. Home contains only its header and reminder list, with Add in the header. Times include AM/PM on one line; weekday lists stay in the editor. A continuous timeline spans the period headings and fills according to the current time; future segments stay gray. Off-day reminders look disabled but remain editable, while their Not today labels do nothing. Compact editors use consistent controls and fit their contents instead of opening full-screen. Editors, status choices, and call/text screens share the visual identity, with all six languages and normal Android incoming-call behavior preserved.
+The member app uses a compact iris-purple reminder timeline. Home contains only its header and reminder list, with Add in the header. Times include AM/PM on one line; weekday lists stay in the editor. A continuous timeline spans the period headings and fills according to the current time; future segments stay gray. Off-day reminders look disabled but remain editable, while their Not today labels do nothing. Compact editors use consistent controls and fit their contents instead of opening full-screen. Poppins typography runs across every screen with `-0.2px` letter spacing. Editors, status choices, and call/text screens share the visual identity, with all six languages and normal Android incoming-call behavior preserved.
 
 Design notes and emulator previews live in [design/remind-me-redesign.md](design/remind-me-redesign.md).
 
