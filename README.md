@@ -19,7 +19,7 @@ Each member has one Admin-assigned Indian mobile number. When that number signs 
 
 - Each reminder has a **Call / Reminder** mode in both editors. Existing reminders default to Call.
 - Reminder mode rings and opens the text question with answer buttons immediately, without an answer gesture, spoken audio, speaker control, or call-style notification. The first answer silences the ring. Information-only messages and text responses stay visible with an **Okay** button; unanswered questions retry after one minute of inactivity plus the normal five-minute retry delay.
-- The member reminder editor includes compact **Today's status** controls for Completed, Not completed, and Skipped. Changes apply immediately, independently of saving reminder settings.
+- Every member reminder card has a **Today's status** tag. Tap it to choose Pending, Completed, or Skip for today. Changes apply immediately, independently of editing reminder settings.
 - Confirmation calls are retired. Old saved confirmation settings and retries are ignored.
 
 - The medicine name is entered without the word `tablet`; Chitti adds `టాబ్లెట్` to the Telugu prompt.

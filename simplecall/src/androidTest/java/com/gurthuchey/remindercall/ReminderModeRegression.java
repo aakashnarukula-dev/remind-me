@@ -156,20 +156,31 @@ final class ReminderModeRegression {
                     "Upcoming reminder has a pending tag");
             click("Pending. Change today's status for Drink water");
             await(() -> find("Today's status") != null, "Pending tag opens status sheet");
+            check(find("Today's status: Not completed") == null,
+                    "Status sheet excludes Not completed");
+            check(find("Today's status: Skip for today") != null,
+                    "Status sheet offers Skip for today");
             capture("reminder-status-sheet.png");
             click("Today's status: Completed");
             await(() -> DailyCallStatus.COMPLETED.equals(new DailyCallStatus(context).display(schedule,
                     System.currentTimeMillis()).kind), "Completion applies from status sheet");
             showReminderCards(activity);
             click("Completed. Change today's status for Drink water");
-            click("Today's status: Skipped");
+            click("Today's status: Pending");
+            await(() -> DailyCallStatus.PENDING.equals(new DailyCallStatus(context).display(schedule,
+                    System.currentTimeMillis()).kind), "Pending clears completed status");
+            showReminderCards(activity);
+            click("Pending. Change today's status for Drink water");
+            click("Today's status: Skip for today");
             await(() -> new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
                     "Skip applies from status sheet");
             showReminderCards(activity);
             click("Skipped. Change today's status for Drink water");
-            click("Today's status: Not completed");
-            await(() -> !new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
-                    "Incomplete clears skip from status sheet");
+            click("Today's status: Pending");
+            await(() -> DailyCallStatus.PENDING.equals(new DailyCallStatus(context).display(schedule,
+                    System.currentTimeMillis()).kind)
+                    && !new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
+                    "Pending clears skipped status");
             runner.runOnMainSync(() -> {
                 try {
                     Method editor = MainActivity.class.getDeclaredMethod("showScheduleDialog",
