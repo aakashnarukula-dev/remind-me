@@ -140,12 +140,12 @@ public final class DailyCallStatusTest {
     }
 
     @Test public void skippedTagSupportsEveryAppLanguage() {
-        assertEquals("Skipped", DailyCallStatus.skippedLabel("en"));
-        assertEquals("దాటవేశారు", DailyCallStatus.skippedLabel("te"));
-        assertEquals("छोड़ा गया", DailyCallStatus.skippedLabel("hi"));
-        assertEquals("தவிர்க்கப்பட்டது", DailyCallStatus.skippedLabel("ta"));
-        assertEquals("ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", DailyCallStatus.skippedLabel("kn"));
-        assertEquals("ഒഴിവാക്കി", DailyCallStatus.skippedLabel("ml"));
+        assertEquals("Skipped for today", DailyCallStatus.skippedLabel("en"));
+        assertEquals("ఈ రోజుకు దాటవేశారు", DailyCallStatus.skippedLabel("te"));
+        assertEquals("आज के लिए छोड़ा", DailyCallStatus.skippedLabel("hi"));
+        assertEquals("இன்று தவிர்க்கப்பட்டது", DailyCallStatus.skippedLabel("ta"));
+        assertEquals("ಇಂದು ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", DailyCallStatus.skippedLabel("kn"));
+        assertEquals("ഇന്ന് ഒഴിവാക്കി", DailyCallStatus.skippedLabel("ml"));
     }
 
     @Test public void legacyAfterMidnightSkipIsClearedOnceAfterUpgrade() {
