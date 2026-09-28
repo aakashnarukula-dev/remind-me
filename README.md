@@ -5,7 +5,7 @@ Two lightweight native Android apps for private family reminder calls:
 - `com.gurthuchey.admin` (`Admin`) manages every family member and reminder.
 - `com.gurthuchey.app` (`గుర్తు చేయి`) shows and edits only the signed-in member's reminders and runs the calls.
 
-The member app uses an iris-purple day planner: a live completion overview, next-reminder focus, time-led agenda, and All reminders / Today only filters. Add and Save actions remain fixed while content scrolls. Reminder editors, daily status choices, and call/text screens share the new visual identity, with all six languages and normal Android incoming-call behavior preserved.
+The member app uses a compact iris-purple reminder timeline. Home contains only its header and reminder list, with Add in the header. Times include AM/PM on one line; weekday lists stay in the editor. A continuous timeline spans the period headings and fills according to the current time; future segments stay gray. Off-day reminders look disabled but remain editable, while their Not today labels do nothing. Compact editors use consistent controls and fit their contents instead of opening full-screen. Editors, status choices, and call/text screens share the visual identity, with all six languages and normal Android incoming-call behavior preserved.
 
 Design notes and emulator previews live in [design/remind-me-redesign.md](design/remind-me-redesign.md).
 
@@ -21,7 +21,7 @@ Each member has one Admin-assigned Indian mobile number. When that number signs 
 
 - Each reminder has a **Call / Reminder** mode in both editors. Existing reminders default to Call.
 - Reminder mode rings and opens the text question with answer buttons immediately, without an answer gesture, spoken audio, speaker control, or call-style notification. The first answer silences the ring. Information-only messages and text responses stay visible with an **Okay** button; unanswered questions retry after one minute of inactivity plus the normal five-minute retry delay.
-- Every member reminder row has a **Today's status** tag. Tap it to choose Pending, Completed, or Skip for today. Changes apply immediately, independently of editing reminder settings.
+- Every member reminder row has a status tag. Pending, Completed, and Skipped tags open today's status choices: Pending, Completed, or Skip for today. Not today tags are disabled. Status changes apply immediately without scrolling the list, independently of editing reminder settings.
 - Confirmation calls are retired. Old saved confirmation settings and retries are ignored.
 
 - The medicine name is entered without the word `tablet`; Chitti adds `టాబ్లెట్` to the Telugu prompt.
@@ -86,7 +86,7 @@ adb -s emulator-5554 shell pm grant com.gurthuchey.app android.permission.POST_N
 adb -s emulator-5554 shell am instrument -w -e regression true com.gurthuchey.app.test/com.gurthuchey.remindercall.SampleLunchCallInstrumentation
 ```
 
-To regenerate synthetic home/editor/status previews and verify the agenda filters, use the same disposable emulator and runner with `-e designPreview true` instead of `-e regression true`. Add `-e language te` for Telugu. The fixture refuses physical devices.
+To regenerate synthetic home/editor/status previews and verify disabled off-day tags and editable off-day rows, use the same disposable emulator and runner with `-e designPreview true` instead of `-e regression true`. Add `-e language te` for Telugu. The fixture refuses physical devices.
 
 Release APKs are R8-minified, resource-shrunk, and signed with this workstation's existing Android signing certificate so future direct-install updates remain compatible.
 

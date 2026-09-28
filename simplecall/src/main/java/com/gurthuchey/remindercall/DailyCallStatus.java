@@ -202,8 +202,8 @@ final class DailyCallStatus {
         int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
                 : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
                 : "ml".equals(language) ? 5 : 0;
-        String[] values = {"Skipped for today", "ఈ రోజుకు దాటవేశారు", "आज के लिए छोड़ा",
-                "இன்று தவிர்க்கப்பட்டது", "ಇಂದು ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", "ഇന്ന് ഒഴിവാക്കി"};
+        String[] values = {"Skipped", "దాటవేశారు", "छोड़ा गया",
+                "தவிர்க்கப்பட்டது", "ಬಿಟ್ಟುಬಿಡಲಾಗಿದೆ", "ഒഴിവാക്കി"};
         return values[index];
     }
 
