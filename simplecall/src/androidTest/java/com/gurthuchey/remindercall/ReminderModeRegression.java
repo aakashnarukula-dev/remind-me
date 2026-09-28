@@ -182,7 +182,7 @@ final class ReminderModeRegression {
             await(() -> new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
                     "Skip applies from status sheet");
             showReminderCards(activity);
-            click("Skipped. Change today's status for Drink water");
+            click("Skipped for today. Change today's status for Drink water");
             click("Today's status: Pending");
             await(() -> DailyCallStatus.PENDING.equals(new DailyCallStatus(context).display(schedule,
                     System.currentTimeMillis()).kind)

@@ -707,11 +707,14 @@ public final class MainActivity extends FragmentActivity {
             trailing.addView(time);
             DailyCallStatus.Display display = dailyCallStatus.display(
                     schedule, System.currentTimeMillis());
-            trailing.addView(statusPill(schedule, display.kind), Ui.margins(
+            TextView statusTag = (TextView) statusPill(schedule, display.kind);
+            trailing.addView(statusTag, Ui.margins(
                     ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
                     this, 0, 3, 0, 0));
+            int statusWidth = (int) Math.ceil(statusTag.getPaint().measureText(
+                    DailyCallStatus.skippedLabel(currentLanguage()))) + Ui.dp(this, 14);
             LinearLayout.LayoutParams trailingParams = new LinearLayout.LayoutParams(
-                    Ui.dp(this, 92), ViewGroup.LayoutParams.WRAP_CONTENT);
+                    Math.max(Ui.dp(this, 92), statusWidth), ViewGroup.LayoutParams.WRAP_CONTENT);
             trailingParams.setMarginEnd(Ui.dp(this, 10));
             card.addView(trailing, trailingParams);
 
