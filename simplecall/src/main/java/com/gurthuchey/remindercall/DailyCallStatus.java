@@ -223,6 +223,15 @@ final class DailyCallStatus {
         return values[index];
     }
 
+    static String pendingLabel(String language) {
+        int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
+                : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
+                : "ml".equals(language) ? 5 : 0;
+        String[] values = {"Pending", "ఇంకా రావాలి", "बाकी है",
+                "நிலுவையில்", "ಬಾಕಿ ಇದೆ", "ബാക്കിയുണ്ട്"};
+        return values[index];
+    }
+
     private void write(String scheduleId, String phase, String state, long nextAt, long now,
             int statusDay) {
         if (scheduleId == null || scheduleId.trim().isEmpty()

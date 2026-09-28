@@ -702,23 +702,9 @@ public final class MainActivity extends FragmentActivity {
             trailing.addView(time);
             DailyCallStatus.Display display = dailyCallStatus.display(
                     schedule, System.currentTimeMillis());
-            if (DailyCallStatus.isIncomplete(display.kind)) {
-                trailing.addView(statusPill(false, schedule), Ui.margins(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
-                        this, 0, 3, 0, 0));
-            } else if (DailyCallStatus.COMPLETED.equals(display.kind)) {
-                trailing.addView(statusPill(true, schedule), Ui.margins(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
-                        this, 0, 3, 0, 0));
-            } else if (DailyCallStatus.SKIPPED.equals(display.kind)) {
-                trailing.addView(skippedPill(schedule), Ui.margins(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
-                        this, 0, 3, 0, 0));
-            } else if (DailyCallStatus.NOT_TODAY.equals(display.kind)) {
-                trailing.addView(notTodayPill(), Ui.margins(
-                        ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
-                        this, 0, 3, 0, 0));
-            }
+            trailing.addView(statusPill(schedule, display.kind), Ui.margins(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
+                    this, 0, 3, 0, 0));
             LinearLayout.LayoutParams trailingParams = new LinearLayout.LayoutParams(
                     Ui.dp(this, 92), ViewGroup.LayoutParams.WRAP_CONTENT);
             trailingParams.setMarginEnd(Ui.dp(this, 10));
@@ -740,49 +726,34 @@ public final class MainActivity extends FragmentActivity {
         }
     }
 
-    private View statusPill(boolean completed, RemoteStore.Schedule schedule) {
-        TextView pill = Ui.text(this,
-                completed ? DailyCallStatus.completedLabel(currentLanguage())
-                        : DailyCallStatus.incompleteLabel(currentLanguage()),
-                9, completed ? Color.rgb(38, 117, 72) : Color.rgb(139, 98, 25), true);
+    private View statusPill(RemoteStore.Schedule schedule, String kind) {
+        boolean completed = DailyCallStatus.COMPLETED.equals(kind);
+        boolean skipped = DailyCallStatus.SKIPPED.equals(kind);
+        boolean incomplete = DailyCallStatus.isIncomplete(kind);
+        String label = completed ? DailyCallStatus.completedLabel(currentLanguage())
+                : skipped ? DailyCallStatus.skippedLabel(currentLanguage())
+                : incomplete ? DailyCallStatus.incompleteLabel(currentLanguage())
+                : DailyCallStatus.NOT_TODAY.equals(kind)
+                ? DailyCallStatus.notTodayLabel(currentLanguage())
+                : DailyCallStatus.pendingLabel(currentLanguage());
+        int ink = completed ? Color.rgb(38, 117, 72)
+                : skipped ? Ui.DANGER
+                : incomplete ? Color.rgb(139, 98, 25) : Color.rgb(83, 99, 116);
+        int background = completed ? Color.rgb(226, 245, 233)
+                : skipped ? Color.rgb(253, 235, 237)
+                : incomplete ? Color.rgb(255, 242, 211) : Color.rgb(232, 239, 245);
+        TextView pill = Ui.text(this, label, 9, ink, true);
         pill.setGravity(Gravity.CENTER);
         pill.setSingleLine(true);
         pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
-        pill.setBackground(Ui.rounded(completed ? Color.rgb(226, 245, 233)
-                : Color.rgb(255, 242, 211), 11, this));
+        pill.setBackground(Ui.rounded(background, 11, this));
         pill.setClickable(true);
-        pill.setContentDescription("Change today's status for " + schedule.label);
-        pill.setOnClickListener(v -> showDailyStatusDialog(schedule, completed));
+        pill.setContentDescription(label + ". Change today's status for " + schedule.label);
+        pill.setOnClickListener(v -> showDailyStatusDialog(schedule));
         return pill;
     }
 
-    private View skippedPill(RemoteStore.Schedule schedule) {
-        TextView pill = Ui.text(this, DailyCallStatus.skippedLabel(currentLanguage()),
-                9, Ui.DANGER, true);
-        pill.setGravity(Gravity.CENTER);
-        pill.setSingleLine(true);
-        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
-        pill.setBackground(Ui.rounded(Color.rgb(253, 235, 237), 11, this));
-        pill.setClickable(true);
-        pill.setContentDescription("Change today's status for " + schedule.label);
-        pill.setOnClickListener(v -> showDailyStatusDialog(schedule, false));
-        return pill;
-    }
-
-    private View notTodayPill() {
-        TextView pill = Ui.text(this, DailyCallStatus.notTodayLabel(currentLanguage()),
-                9, Color.rgb(83, 99, 116), true);
-        pill.setGravity(Gravity.CENTER);
-        pill.setSingleLine(true);
-        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
-        pill.setBackground(Ui.rounded(Color.rgb(232, 239, 245), 11, this));
-        pill.setContentDescription(DailyCallStatus.notTodayLabel(currentLanguage()));
-        return pill;
-    }
-
-    private void showDailyStatusDialog(RemoteStore.Schedule schedule, boolean completed) {
-        boolean skippedToday = dailyCallStatus.isSkippedToday(
-                schedule.id, System.currentTimeMillis());
+    private void showDailyStatusDialog(RemoteStore.Schedule schedule) {
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dialog.setCanceledOnTouchOutside(true);
@@ -852,7 +823,8 @@ public final class MainActivity extends FragmentActivity {
         Runnable update = () -> {
             String kind = dailyCallStatus.display(schedule, System.currentTimeMillis()).kind;
             int selected = DailyCallStatus.COMPLETED.equals(kind) ? 0
-                    : DailyCallStatus.SKIPPED.equals(kind) ? 2 : 1;
+                    : DailyCallStatus.SKIPPED.equals(kind) ? 2
+                    : DailyCallStatus.isIncomplete(kind) ? 1 : -1;
             for (int i = 0; i < controls.length; i++) {
                 controls[i].setSelected(i == selected);
                 controls[i].setBackground(Ui.roundedWithStroke(backgrounds[i], 12,
@@ -970,15 +942,6 @@ public final class MainActivity extends FragmentActivity {
         form.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 6));
         form.setClipChildren(false);
         form.setClipToPadding(false);
-
-        if (existing != null) {
-            form.addView(fieldLabel("Today's status"), sizedMargins(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                    0, 0, 0, 4));
-            form.addView(dailyStatusControls(existing, this::render), sizedMargins(
-                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                    0, 0, 0, 8));
-        }
 
         form.addView(fieldLabel("Category"));
         Runnable[] updateCategoryUi = new Runnable[1];
