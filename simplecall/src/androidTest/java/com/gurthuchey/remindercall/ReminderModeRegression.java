@@ -11,8 +11,10 @@ import android.media.AudioManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
+import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -151,7 +153,9 @@ final class ReminderModeRegression {
             new RemoteStore(context).save(config);
             MainActivity activity = (MainActivity) runner.startActivitySync(new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
-            showReminderCards(activity);
+            ScrollView cards = showReminderCards(activity);
+            int scrollBeforeStatusChange = cards.getScrollY();
+            check(scrollBeforeStatusChange > 0, "Reminder list starts scrolled");
             await(() -> find("Pending. Change today's status for Drink water") != null,
                     "Upcoming reminder has a pending tag");
             click("Pending. Change today's status for Drink water");
@@ -164,6 +168,9 @@ final class ReminderModeRegression {
             click("Today's status: Completed");
             await(() -> DailyCallStatus.COMPLETED.equals(new DailyCallStatus(context).display(schedule,
                     System.currentTimeMillis()).kind), "Completion applies from status sheet");
+            runner.waitForIdleSync();
+            check(cards.getScrollY() == scrollBeforeStatusChange,
+                    "Changing today's status preserves reminder scroll position");
             showReminderCards(activity);
             click("Completed. Change today's status for Drink water");
             click("Today's status: Pending");
@@ -220,19 +227,30 @@ final class ReminderModeRegression {
         SystemClock.sleep(1500);
     }
 
-    private void showReminderCards(MainActivity activity) {
+    private ScrollView showReminderCards(MainActivity activity) {
+        ScrollView[] shown = new ScrollView[1];
         runner.runOnMainSync(() -> {
             try {
+                ScrollView scroll = new ScrollView(activity);
                 LinearLayout body = new LinearLayout(activity);
                 body.setOrientation(LinearLayout.VERTICAL);
+                body.addView(new View(activity), new LinearLayout.LayoutParams(
+                        1, Ui.dp(activity, 450)));
                 Method cards = MainActivity.class.getDeclaredMethod("addSchedules",
                         LinearLayout.class, RemoteStore.Config.class);
                 cards.setAccessible(true);
                 cards.invoke(activity, body, config);
-                activity.setContentView(body);
+                body.addView(new View(activity), new LinearLayout.LayoutParams(
+                        1, Ui.dp(activity, 800)));
+                scroll.addView(body);
+                activity.setContentView(scroll);
+                shown[0] = scroll;
             } catch (Exception error) { throw new RuntimeException(error); }
         });
         runner.waitForIdleSync();
+        runner.runOnMainSync(() -> shown[0].scrollTo(0, Ui.dp(activity, 400)));
+        runner.waitForIdleSync();
+        return shown[0];
     }
 
     private void start(String phase) {
