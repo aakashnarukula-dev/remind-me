@@ -118,6 +118,15 @@ public final class DailyCallStatusTest {
         assertEquals("ഇന്ന് ഇല്ല", DailyCallStatus.notTodayLabel("ml"));
     }
 
+    @Test public void pendingTagSupportsEveryAppLanguage() {
+        assertEquals("Pending", DailyCallStatus.pendingLabel("en"));
+        assertEquals("ఇంకా రావాలి", DailyCallStatus.pendingLabel("te"));
+        assertEquals("बाकी है", DailyCallStatus.pendingLabel("hi"));
+        assertEquals("நிலுவையில்", DailyCallStatus.pendingLabel("ta"));
+        assertEquals("ಬಾಕಿ ಇದೆ", DailyCallStatus.pendingLabel("kn"));
+        assertEquals("ബാക്കിയുണ്ട്", DailyCallStatus.pendingLabel("ml"));
+    }
+
     @Test public void skippedReminderUsesItsOwnCardState() {
         assertEquals(DailyCallStatus.SKIPPED, DailyCallStatus.applySkippedToday(
                 DailyCallStatus.UPCOMING, true));

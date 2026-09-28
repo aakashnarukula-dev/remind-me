@@ -12,10 +12,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.widget.LinearLayout;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.lang.reflect.Method;
+import java.util.Calendar;
 import java.util.function.BooleanSupplier;
 
 /** Offline regression suite. Run only on a disposable emulator with -e regression true. */
@@ -136,9 +138,38 @@ final class ReminderModeRegression {
             schedule.confirmationMinutes = 0;
             schedule.category = "task";
             schedule.preMinutes = 0;
+            Calendar due = Calendar.getInstance();
+            int today = due.get(Calendar.DAY_OF_YEAR);
+            due.add(Calendar.MINUTE, 2);
+            if (due.get(Calendar.DAY_OF_YEAR) != today) {
+                due = Calendar.getInstance();
+                due.set(Calendar.HOUR_OF_DAY, 23);
+                due.set(Calendar.MINUTE, 59);
+            }
+            schedule.hour = due.get(Calendar.HOUR_OF_DAY);
+            schedule.minute = due.get(Calendar.MINUTE);
             new RemoteStore(context).save(config);
             MainActivity activity = (MainActivity) runner.startActivitySync(new Intent(context, MainActivity.class)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK));
+            showReminderCards(activity);
+            await(() -> find("Pending. Change today's status for Drink water") != null,
+                    "Upcoming reminder has a pending tag");
+            click("Pending. Change today's status for Drink water");
+            await(() -> find("Today's status") != null, "Pending tag opens status sheet");
+            capture("reminder-status-sheet.png");
+            click("Today's status: Completed");
+            await(() -> DailyCallStatus.COMPLETED.equals(new DailyCallStatus(context).display(schedule,
+                    System.currentTimeMillis()).kind), "Completion applies from status sheet");
+            showReminderCards(activity);
+            click("Completed. Change today's status for Drink water");
+            click("Today's status: Skipped");
+            await(() -> new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
+                    "Skip applies from status sheet");
+            showReminderCards(activity);
+            click("Skipped. Change today's status for Drink water");
+            click("Today's status: Not completed");
+            await(() -> !new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
+                    "Incomplete clears skip from status sheet");
             runner.runOnMainSync(() -> {
                 try {
                     Method editor = MainActivity.class.getDeclaredMethod("showScheduleDialog",
@@ -147,18 +178,9 @@ final class ReminderModeRegression {
                     editor.invoke(activity, config, schedule);
                 } catch (Exception error) { throw new RuntimeException(error); }
             });
-            await(() -> find("Today's status") != null, "Inline status editor visible");
+            check(find("Today's status") == null, "Reminder editor excludes today's status controls");
             capture("reminder-editor.png");
-            click("Today's status: Completed");
-            await(() -> DailyCallStatus.COMPLETED.equals(new DailyCallStatus(context).display(schedule,
-                    System.currentTimeMillis()).kind), "Inline completion applies without Save");
-            click("Today's status: Skipped");
-            await(() -> new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
-                    "Inline skip applies");
-            click("Today's status: Not completed");
-            await(() -> !new DailyCallStatus(context).isSkippedToday(schedule.id, System.currentTimeMillis()),
-                    "Inline incomplete clears skip");
-            result.putString("stream", "PASS: offline mode, direct questions, text responses, information acknowledgment, snooze, skip, timeout retry, call compatibility, meal text, retired confirmation, inline status.\n");
+            result.putString("stream", "PASS: offline mode, direct questions, text responses, information acknowledgment, snooze, skip, timeout retry, call compatibility, meal text, retired confirmation, status tags and sheet.\n");
             runner.finish(Activity.RESULT_OK, result);
         } catch (Throwable error) {
             result.putString("stream", "FAIL: " + android.util.Log.getStackTraceString(error));
@@ -185,6 +207,21 @@ final class ReminderModeRegression {
         ReminderScheduler.cancelAll(context, config);
         new DailyCallStatus(context).clearSchedule(schedule.id);
         SystemClock.sleep(1500);
+    }
+
+    private void showReminderCards(MainActivity activity) {
+        runner.runOnMainSync(() -> {
+            try {
+                LinearLayout body = new LinearLayout(activity);
+                body.setOrientation(LinearLayout.VERTICAL);
+                Method cards = MainActivity.class.getDeclaredMethod("addSchedules",
+                        LinearLayout.class, RemoteStore.Config.class);
+                cards.setAccessible(true);
+                cards.invoke(activity, body, config);
+                activity.setContentView(body);
+            } catch (Exception error) { throw new RuntimeException(error); }
+        });
+        runner.waitForIdleSync();
     }
 
     private void start(String phase) {
