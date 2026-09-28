@@ -56,8 +56,10 @@ import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 public final class MainActivity extends FragmentActivity {
@@ -87,6 +89,7 @@ public final class MainActivity extends FragmentActivity {
     private boolean scheduleListenerRegistered;
     private boolean statusListenerRegistered;
     private ScrollView mainScroll;
+    private final Map<TextView, RemoteStore.Schedule> statusPills = new HashMap<>();
     private RemoteStore.Config optimisticConfig;
     private final Handler dayRolloverHandler = new Handler(Looper.getMainLooper());
     private final Runnable dayRollover = () -> {
@@ -103,7 +106,7 @@ public final class MainActivity extends FragmentActivity {
             };
     private final SharedPreferences.OnSharedPreferenceChangeListener statusListener =
             (preferences, key) -> runOnUiThread(() -> {
-                render();
+                refreshDailyStatusPills();
                 scheduleDayRollover();
             });
 
@@ -201,6 +204,7 @@ public final class MainActivity extends FragmentActivity {
             renderLogin();
             return;
         }
+        statusPills.clear();
         int previousScrollY = mainScroll == null ? 0 : mainScroll.getScrollY();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
@@ -356,6 +360,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void renderLogin() {
         mainScroll = null;
+        statusPills.clear();
         optimisticConfig = null;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
         android.widget.FrameLayout root = new android.widget.FrameLayout(this);
@@ -727,6 +732,26 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private View statusPill(RemoteStore.Schedule schedule, String kind) {
+        TextView pill = Ui.text(this, "", 9, Color.rgb(83, 99, 116), true);
+        pill.setGravity(Gravity.CENTER);
+        pill.setSingleLine(true);
+        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.setClickable(true);
+        pill.setOnClickListener(v -> showDailyStatusDialog(schedule));
+        updateStatusPill(pill, schedule, kind);
+        statusPills.put(pill, schedule);
+        return pill;
+    }
+
+    private void refreshDailyStatusPills() {
+        long now = System.currentTimeMillis();
+        for (Map.Entry<TextView, RemoteStore.Schedule> entry : statusPills.entrySet()) {
+            RemoteStore.Schedule schedule = entry.getValue();
+            updateStatusPill(entry.getKey(), schedule, dailyCallStatus.display(schedule, now).kind);
+        }
+    }
+
+    private void updateStatusPill(TextView pill, RemoteStore.Schedule schedule, String kind) {
         boolean completed = DailyCallStatus.COMPLETED.equals(kind);
         boolean skipped = DailyCallStatus.SKIPPED.equals(kind);
         String label = completed ? DailyCallStatus.completedLabel(currentLanguage())
@@ -740,15 +765,10 @@ public final class MainActivity extends FragmentActivity {
         int background = completed ? Color.rgb(226, 245, 233)
                 : skipped ? Color.rgb(253, 235, 237)
                 : Color.rgb(232, 239, 245);
-        TextView pill = Ui.text(this, label, 9, ink, true);
-        pill.setGravity(Gravity.CENTER);
-        pill.setSingleLine(true);
-        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.setText(label);
+        pill.setTextColor(ink);
         pill.setBackground(Ui.rounded(background, 11, this));
-        pill.setClickable(true);
         pill.setContentDescription(label + ". Change today's status for " + schedule.label);
-        pill.setOnClickListener(v -> showDailyStatusDialog(schedule));
-        return pill;
     }
 
     private void showDailyStatusDialog(RemoteStore.Schedule schedule) {
@@ -785,7 +805,7 @@ public final class MainActivity extends FragmentActivity {
 
         sheet.addView(dailyStatusControls(schedule, () -> {
             dialog.dismiss();
-            render();
+            refreshDailyStatusPills();
         }));
 
         TextView note = Ui.text(this, "Applies to today only", 12, Ui.MUTED, false);
