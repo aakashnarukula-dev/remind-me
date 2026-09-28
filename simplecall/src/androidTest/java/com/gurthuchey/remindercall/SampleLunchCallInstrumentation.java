@@ -21,6 +21,10 @@ public final class SampleLunchCallInstrumentation extends Instrumentation {
     }
 
     @Override public void onStart() {
+        if (arguments != null && "true".equals(arguments.getString("designPreview"))) {
+            DesignPreview.run(this, arguments.getString("language", "en"));
+            return;
+        }
         if (arguments != null && "true".equals(arguments.getString("regression"))) {
             new ReminderModeRegression(this).run();
             return;

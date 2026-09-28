@@ -23,24 +23,25 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 final class Ui {
-    static final int BG = Color.rgb(247, 250, 252);
-    static final int RAISED = Color.rgb(234, 244, 248);
-    static final int RAISED2 = Color.rgb(255, 255, 255);
-    static final int INK = Color.rgb(36, 51, 74);
-    static final int MUTED = Color.rgb(107, 123, 143);
-    static final int LINE = Color.rgb(214, 227, 236);
-    static final int GOLD = Color.rgb(240, 210, 154);
-    static final int PRIMARY = Color.rgb(185, 221, 240);
-    static final int DANGER = Color.rgb(186, 89, 104);
-    static final int NAVY = Color.rgb(49, 94, 122);
+    static final int BG = Color.rgb(246, 245, 251);
+    static final int RAISED = Color.rgb(238, 234, 248);
+    static final int RAISED2 = Color.WHITE;
+    static final int INK = Color.rgb(39, 36, 61);
+    static final int MUTED = Color.rgb(111, 107, 130);
+    static final int LINE = Color.rgb(226, 222, 237);
+    static final int ACCENT = Color.rgb(102, 82, 204);
+    static final int GOLD = ACCENT;
+    static final int PRIMARY = Color.rgb(234, 229, 252);
+    static final int DANGER = Color.rgb(167, 71, 96);
+    static final int NAVY = Color.rgb(74, 56, 161);
     static final int SURFACE = BG;
     static final int WHITE = Color.WHITE;
-    static final int ACCEPT = Color.rgb(63, 128, 111);
-    static final int ACCEPT_LIGHT = Color.rgb(213, 237, 227);
-    static final int REJECT = Color.rgb(199, 95, 109);
-    static final int AMBER = Color.rgb(216, 168, 77);
-    static final int GARDEN_INK = Color.rgb(23, 55, 47);
-    static final int GARDEN_MUTED = Color.rgb(91, 113, 105);
+    static final int ACCEPT = Color.rgb(39, 117, 102);
+    static final int ACCEPT_LIGHT = Color.rgb(223, 242, 233);
+    static final int REJECT = DANGER;
+    static final int AMBER = Color.rgb(161, 111, 43);
+    static final int GARDEN_INK = INK;
+    static final int GARDEN_MUTED = MUTED;
 
     private Ui() {}
 
@@ -54,7 +55,7 @@ final class Ui {
         view.setTextSize(size);
         view.setTextColor(color);
         view.setGravity(Gravity.CENTER_VERTICAL);
-        view.setTypeface(Typeface.create("sans", bold ? Typeface.BOLD : Typeface.NORMAL));
+        view.setTypeface(Typeface.create(bold ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
         view.setLineSpacing(0, 1.12f);
         return view;
     }
@@ -126,12 +127,11 @@ final class Ui {
     }
 
     static Drawable callBackdrop() {
-        return new GardenBackdrop();
+        return new DaylightBackdrop();
     }
 
     static GradientDrawable glass(Context context, int radiusDp) {
-        return roundedWithStroke(Color.argb(220, 249, 252, 246), radiusDp,
-                Color.argb(242, 255, 255, 255), 1, context);
+        return roundedWithStroke(WHITE, radiusDp, LINE, 1, context);
     }
 
     static RippleDrawable actionBackground(Context context, int color, int radiusDp) {
@@ -149,58 +149,56 @@ final class Ui {
     }
 
     static GradientDrawable glassCircle(Context context) {
-        GradientDrawable drawable = circle(Color.argb(205, 249, 252, 246));
+        GradientDrawable drawable = circle(PRIMARY);
         drawable.setStroke(dp(context, 1), Color.argb(242, 255, 255, 255));
         return drawable;
     }
 
-    /** A quiet botanical backdrop drawn locally, so the call screen remains fully offline. */
-    private static final class GardenBackdrop extends Drawable {
+    static Drawable reminderMark() { return new ReminderMark(); }
+
+    private static final class ReminderMark extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-        private final RectF oval = new RectF();
-
         @Override public void draw(Canvas canvas) {
-            int width = getBounds().width();
-            int height = getBounds().height();
-            paint.setShader(new LinearGradient(0, 0, width, height,
-                    new int[]{Color.rgb(247, 250, 244), Color.rgb(232, 241, 228),
-                            Color.rgb(218, 233, 216)},
-                    new float[]{0f, .52f, 1f}, Shader.TileMode.CLAMP));
-            canvas.drawRect(getBounds(), paint);
-
-            paint.setShader(new RadialGradient(width * .2f, height * .18f, width * .62f,
-                    new int[]{Color.argb(185, 255, 255, 255), Color.TRANSPARENT},
-                    null, Shader.TileMode.CLAMP));
-            canvas.drawRect(getBounds(), paint);
-            paint.setShader(null);
-
-            drawLeaf(canvas, width * -.12f, height * .30f, width * .70f,
-                    height * .13f, -24f, Color.argb(23, 52, 112, 77));
-            drawLeaf(canvas, width * .58f, height * .46f, width * .62f,
-                    height * .12f, 29f, Color.argb(19, 44, 105, 69));
-            drawLeaf(canvas, width * -.08f, height * .67f, width * .50f,
-                    height * .10f, 18f, Color.argb(13, 68, 126, 83));
+            RectF area = new RectF(getBounds());
+            float size = Math.min(area.width(), area.height());
+            float cx = area.centerX(), cy = area.centerY();
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(ACCENT);
+            canvas.drawRoundRect(area, size * .30f, size * .30f, paint);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setColor(WHITE);
+            paint.setStrokeWidth(size * .065f);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            canvas.drawArc(cx - size * .27f, cy - size * .27f,
+                    cx + size * .27f, cy + size * .27f, -60, 310, false, paint);
+            canvas.drawLine(cx, cy - size * .15f, cx, cy + size * .015f, paint);
+            canvas.drawLine(cx, cy + size * .015f, cx + size * .13f, cy + size * .09f, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(246, 182, 144));
+            canvas.drawCircle(cx + size * .26f, cy - size * .24f, size * .075f, paint);
         }
-
-        private void drawLeaf(Canvas canvas, float left, float top, float width,
-                float height, float rotation, int color) {
-            canvas.save();
-            canvas.rotate(rotation, left + width / 2f, top + height / 2f);
-            oval.set(left, top, left + width, top + height);
-            paint.setColor(color);
-            canvas.drawOval(oval, paint);
-            paint.setColor(Color.argb(15, 30, 80, 52));
-            paint.setStrokeWidth(Math.max(1f, width * .008f));
-            canvas.drawLine(left + width * .13f, top + height * .70f,
-                    left + width * .87f, top + height * .30f, paint);
-            canvas.restore();
-        }
-
         @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
-        @Override public void setColorFilter(android.graphics.ColorFilter colorFilter) {
-            paint.setColorFilter(colorFilter);
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) { paint.setColorFilter(filter); }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
+    /** A simple clock orbit keeps reminder screens recognizable and fully offline. */
+    private static final class DaylightBackdrop extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        @Override public void draw(Canvas canvas) {
+            canvas.drawColor(BG);
+            float width = getBounds().width();
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(Math.max(1, width * .003f));
+            paint.setColor(Color.rgb(231, 225, 247));
+            canvas.drawCircle(width * .86f, width * .15f, width * .60f, paint);
+            canvas.drawCircle(width * .86f, width * .15f, width * .76f, paint);
+            paint.setStyle(Paint.Style.FILL);
+            paint.setColor(Color.rgb(246, 182, 144));
+            canvas.drawCircle(width * .29f, width * .33f, width * .014f, paint);
         }
-        @SuppressWarnings("deprecation")
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) { paint.setColorFilter(filter); }
         @Override public int getOpacity() { return PixelFormat.OPAQUE; }
     }
 

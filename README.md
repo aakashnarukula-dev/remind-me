@@ -5,7 +5,9 @@ Two lightweight native Android apps for private family reminder calls:
 - `com.gurthuchey.admin` (`Admin`) manages every family member and reminder.
 - `com.gurthuchey.app` (`గుర్తు చేయి`) shows and edits only the signed-in member's reminders and runs the calls.
 
-Both apps use the same lightweight pastel interface. The incoming reminder-call screen keeps its high-contrast light design, large Telugu controls, and normal Android incoming-call behavior.
+The member app uses an iris-purple day planner: a live completion overview, next-reminder focus, time-led agenda, and All reminders / Today only filters. Add and Save actions remain fixed while content scrolls. Reminder editors, daily status choices, and call/text screens share the new visual identity, with all six languages and normal Android incoming-call behavior preserved.
+
+Design notes and emulator previews live in [design/remind-me-redesign.md](design/remind-me-redesign.md).
 
 ## Sign-in and ownership
 
@@ -19,7 +21,7 @@ Each member has one Admin-assigned Indian mobile number. When that number signs 
 
 - Each reminder has a **Call / Reminder** mode in both editors. Existing reminders default to Call.
 - Reminder mode rings and opens the text question with answer buttons immediately, without an answer gesture, spoken audio, speaker control, or call-style notification. The first answer silences the ring. Information-only messages and text responses stay visible with an **Okay** button; unanswered questions retry after one minute of inactivity plus the normal five-minute retry delay.
-- Every member reminder card has a **Today's status** tag. Tap it to choose Pending, Completed, or Skip for today. Changes apply immediately, independently of editing reminder settings.
+- Every member reminder row has a **Today's status** tag. Tap it to choose Pending, Completed, or Skip for today. Changes apply immediately, independently of editing reminder settings.
 - Confirmation calls are retired. Old saved confirmation settings and retries are ignored.
 
 - The medicine name is entered without the word `tablet`; Chitti adds `టాబ్లెట్` to the Telugu prompt.
@@ -83,6 +85,8 @@ adb -s emulator-5554 install -r simplecall/build/outputs/apk/androidTest/debug/G
 adb -s emulator-5554 shell pm grant com.gurthuchey.app android.permission.POST_NOTIFICATIONS
 adb -s emulator-5554 shell am instrument -w -e regression true com.gurthuchey.app.test/com.gurthuchey.remindercall.SampleLunchCallInstrumentation
 ```
+
+To regenerate synthetic home/editor/status previews and verify the agenda filters, use the same disposable emulator and runner with `-e designPreview true` instead of `-e regression true`. Add `-e language te` for Telugu. The fixture refuses physical devices.
 
 Release APKs are R8-minified, resource-shrunk, and signed with this workstation's existing Android signing certificate so future direct-install updates remain compatible.
 
