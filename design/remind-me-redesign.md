@@ -1,46 +1,26 @@
-# Remind Me: a day planner, not a list of alarm cards
+# Remind Me: compact reminder timeline
 
-## Direction
-A quiet, personal agenda with a recognizable iris accent. Time is the organizing element: a narrow time rail, open reminder rows, and a single next-reminder panel. Status remains directly editable without rebuilding the page.
+## Current direction
+Home contains a header and reminder list. The header keeps branding, Add reminder, and the account/language menu. The date, completion summary, next-reminder panel, list heading, filter toggle, and bottom Add dock are removed.
 
 ## Tokens
-- Cloud `#F6F5FB`: page canvas.
-- Paper `#FFFFFF`: forms and surfaces.
-- Ink `#27243D`: primary reading text.
-- Iris `#6652CC`: primary actions and next reminder.
-- Lilac `#EAE5FC`: selected controls.
-- Sage `#277566`: completed state; rose `#A74760`: skipped state.
+Cloud `#F6F5FB`, paper `#FFFFFF`, ink `#27243D`, iris `#6652CC`, lilac `#EAE5FC`, sage `#277566`, rose `#A74760`.
 
-Android system sans-serif supplies multilingual body text; sans-serif-medium defines titles. Condensed numerals give times a clear, compact column. Main title 26sp, reminder titles 15sp, body 14sp, supporting labels 10–12sp. Status controls keep a 40dp tap height; Add stays 46dp.
+System sans-serif supports all six app languages. Reminder titles use 15sp; times use condensed 14sp numerals with AM/PM on the same line, fitting down when text size increases. Rows start at 66dp and grow only for long names. Weekday schedules appear in the editor, not below reminder rows. Status tags retain 40dp touch height; header actions are 44dp.
 
-## Layout
-Left-aligned, time-led home screen:
+## Timeline behavior
+A single rail is drawn behind all rows and period headings. Period labels sit in the left time gutter; reminder content stays to the right. Row-center dots define reminder times. Elapsed time fills the rail in iris; future time remains gray. Between reminder times, the fill interpolates between their row centers, including any intervening section headings. The rail updates on minute boundaries, without rebuilding or scrolling the list.
 
-    Remind me                         Profile
-    Monday, 28 September
-    Today   3 of 12 completed      day progress
-    [ Next up                                ]
-    [ 5:30 pm           Evening walk          ]
-    Your reminders   [All reminders | Today]
-    Morning
-    8:00 | Medicine name     [Today's status]
-      am | Medicine · Call
-    ...
-    [                + Add reminder          ]
+Reminders not scheduled today use muted text and gray status tags. Their names still open the usual reminder editor. Their disabled Not today tags consume taps without opening either the editor or the daily status sheet. Pending, Completed, and Skipped tags retain direct status editing; the skip action remains Skip for today.
 
-The editor uses a large title input, compact category choices, a distinct time control, delivery mode, weekday toggles, and a sticky Save action. Status choices become three descriptive rows. Calls and text reminders share the iris identity and a focused question surface.
-
-## Review against the brief
-A palette change alone would leave the old app intact. This design replaces icon-first elevated cards with a time rail, adds a useful next-reminder focus, relocates the primary add action, and rebuilds the editing hierarchy. Avoid decorative gradients, emoji-led chrome, fake calendar controls, and a row of statistic cards. Preserve offline scheduling, all six languages, current call/reminder modes, status wording, and scroll stability.
-
-## Compactness pass
-The first phone preview required too much scrolling. The final home screen uses a single-line daily summary, a shorter next-reminder panel, and side-by-side reminder title/status. Rows start at 66dp instead of roughly 114dp, with extra height only for wrapping names or specific weekday schedules. The Add dock and section spacing are smaller. Status changes still update in place.
+## Other screens
+The editor has 14sp title/time fields, 12sp field labels, 13sp buttons, and 40dp controls with tight section spacing. Sheets wrap their contents and cap at 72% of screen height, with scrollable forms and a fixed Save action. Short conversation sheets also wrap their contents. Daily status uses compact descriptive action rows. Calls and text reminders retain the iris visual identity and offline behavior.
 
 ## Validation
-- Release unit tests and Android lint pass (zero lint errors; existing warnings remain).
-- Disposable-emulator regression passes: call and text flows, completion, snooze, skip, timeout/retry, all reminder tags, status choices, and scroll preservation.
-- Design fixture verifies All reminders / Today only filtering and captures home, status, and editor screens.
-- English and Telugu checked visually, including 130% font size; weekday labels fit without wrapping and the editor remains scrollable.
-- Release build 86 installed and inspected on Samsung S22 Ultra; six full reminder rows plus part of a seventh fit on the initial screen, with member reminders and existing statuses retained.
+- Release unit tests and Android lint pass; timeline tests cover boundaries, exact reminder times, interpolation across sections, duplicate times, and empty lists.
+- Disposable-emulator UI checks cover removed home controls, disabled Not today taps, and editing off-day reminders.
+- Reminder-mode regression covers call/text flows, snooze, skip, timeout/retry, status editing, and scroll preservation.
+- English and Telugu preview fixtures are emulator-only; 130% text size remains readable. Member data is never replaced during phone testing.
+- Build 88 installed on Samsung S22 Ultra. Not today taps open no sheet; the same reminder name opens the editor. The standard editor now occupies about half the phone screen instead of nearly all of it.
 
 Synthetic-data previews: [home](previews/home.png), [status](previews/status.png), [editor](previews/editor.png).
