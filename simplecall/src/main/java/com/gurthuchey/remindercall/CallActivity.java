@@ -156,21 +156,21 @@ public final class CallActivity extends android.app.Activity {
         Ui.safeArea(page, true, true, true, true);
         page.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        TextView status = centered("●  " + reminderTitle,
+        TextView status = centered(AppLanguage.ui(language, "Reminder call"),
                 14, Ui.GARDEN_INK, true);
         status.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         status.setBackground(Ui.glass(this, 22));
         page.addView(status, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, Ui.dp(this, 42)));
 
-        page.addView(Ui.spacer(this, 58));
+        page.addView(Ui.spacer(this, 72));
         page.addView(medicineMark(126), new LinearLayout.LayoutParams(
                 Ui.dp(this, 126), Ui.dp(this, 126)));
 
-        TextView caller = centered(AppLanguage.caller(language), 34, Ui.GARDEN_INK, true);
+        TextView caller = centered(reminderTitle, 32, Ui.INK, true);
         caller.setPadding(Ui.dp(this, 12), Ui.dp(this, 30), Ui.dp(this, 12), 0);
         page.addView(caller, Ui.matchWrap());
-        TextView incoming = centered(reminderTitle, 17,
+        TextView incoming = centered(AppLanguage.caller(language), 17,
                 Ui.GARDEN_MUTED, false);
         incoming.setPadding(0, Ui.dp(this, 7), 0, 0);
         page.addView(incoming, Ui.matchWrap());
@@ -188,7 +188,7 @@ public final class CallActivity extends android.app.Activity {
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         actions.addView(callControl("☎", "Reject", Ui.REJECT, CallService.ACTION_REJECT),
                 controlParams);
-        actions.addView(callControl("☎", "Answer", Ui.ACCEPT, CallService.ACTION_ANSWER),
+        actions.addView(callControl("☎", "Answer", Ui.ACCENT, CallService.ACTION_ANSWER),
                 controlParams);
         page.addView(actions, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -213,22 +213,23 @@ public final class CallActivity extends android.app.Activity {
         headerParams.gravity = Gravity.CENTER_HORIZONTAL;
         boolean textReminder = session.getBoolean("textReminder", false);
         if (textReminder) {
-            TextView title = centered(reminderTitle(language), 20, Ui.GARDEN_INK, true);
-            page.addView(title, Ui.matchWrap());
+            TextView eyebrow = Ui.text(this, "Reminder", 13, Ui.ACCENT, true);
+            page.addView(eyebrow);
+            TextView title = Ui.text(this, reminderTitle(language), 27, Ui.INK, true);
+            page.addView(title, Ui.margins(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, this, 0, 8, 0, 0));
         } else {
             page.addView(connectedHeader(AppLanguage.caller(language),
                     session.getBoolean("speakerOn", false)), headerParams);
         }
 
-        View space = new View(this);
-        page.addView(space, new LinearLayout.LayoutParams(1, 0, 1));
+        page.addView(Ui.spacer(this, 28));
 
         LinearLayout interactionSheet = new LinearLayout(this);
         interactionSheet.setOrientation(LinearLayout.VERTICAL);
         interactionSheet.setPadding(Ui.dp(this, 22), Ui.dp(this, 26),
                 Ui.dp(this, 22), Ui.dp(this, 10));
-        interactionSheet.setBackground(Ui.glass(this, 34));
-        interactionSheet.setElevation(Ui.dp(this, 5));
+        interactionSheet.setBackground(Ui.glass(this, 24));
+        interactionSheet.setElevation(0);
 
         String questionText = session.getString("question", "Reminder call");
         String answerA = session.getString("answerA", "Yes");
@@ -239,7 +240,7 @@ public final class CallActivity extends android.app.Activity {
                 SpeechText.answerLater(language));
         boolean showRemindLater = session.getBoolean("showRemindLater", false);
         boolean customCall = session.getBoolean("customCall", false);
-        TextView question = Ui.text(this, "", 25, Ui.GARDEN_INK, true);
+        TextView question = Ui.text(this, "", 26, Ui.INK, true);
         question.setText(highlightButtonLabels(questionText, customCall,
                 answerA, answerB, answerC, answerD,
                 showRemindLater ? remindLaterLabel : ""));
@@ -277,18 +278,12 @@ public final class CallActivity extends android.app.Activity {
                 interactionSheet.addView(remindLaterOptions(remindLaterLabel, step));
             }
         }
-        if (textReminder) {
-            android.widget.ScrollView scroll = new android.widget.ScrollView(this);
-            scroll.setFillViewport(false);
-            scroll.setClipToPadding(false);
-            scroll.addView(interactionSheet);
-            page.addView(scroll, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, 0, 8f));
-        } else {
-            page.addView(interactionSheet, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        }
-        page.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
+        android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+        scroll.setFillViewport(false);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(interactionSheet);
+        page.addView(scroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f));
         setContentView(page);
     }
 
@@ -331,11 +326,11 @@ public final class CallActivity extends android.app.Activity {
 
     private ImageView medicineMark(int sizeDp) {
         ImageView mark = new ImageView(this);
-        mark.setImageResource(R.mipmap.ic_launcher);
+        mark.setImageDrawable(Ui.reminderMark());
         int padding = Ui.dp(this, Math.max(8, Math.round(sizeDp * 0.18f)));
         mark.setPadding(padding, padding, padding, padding);
         mark.setBackground(Ui.glassCircle(this));
-        mark.setElevation(Ui.dp(this, 3));
+        mark.setElevation(0);
         mark.setContentDescription("Reminder call");
         return mark;
     }
@@ -384,8 +379,8 @@ public final class CallActivity extends android.app.Activity {
         holder.setClipToPadding(false);
         TextView circle = centered(icon, 31, Color.WHITE, true);
         circle.setRotation(CallService.ACTION_REJECT.equals(action) ? 135 : 0);
-        circle.setBackground(Ui.actionBackground(this, color, 40));
-        circle.setElevation(Ui.dp(this, 3));
+        circle.setBackground(Ui.actionBackground(this, color, 26));
+        circle.setElevation(0);
         boolean reject = CallService.ACTION_REJECT.equals(action);
         circle.setContentDescription(AppLanguage.ui(callLanguage(),
                 reject ? "Swipe to reject" : "Swipe to answer"));
@@ -458,11 +453,11 @@ public final class CallActivity extends android.app.Activity {
     }
 
     private TextView option(String label, int index, int expectedStep, boolean customCall) {
-        TextView option = centered(label, 18, customCall ? Ui.INK : Color.WHITE, true);
+        TextView option = centered(label, 17, index == 0 ? Ui.WHITE : Ui.INK, true);
         option.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         option.setBackground(Ui.actionBackground(this,
-                customCall ? Ui.PRIMARY : index == 0 ? Ui.ACCEPT : Ui.REJECT, 22));
-        option.setElevation(Ui.dp(this, 3));
+                index == 0 ? Ui.ACCENT : Ui.PRIMARY, 16));
+        option.setElevation(0);
         option.setOnClickListener(v -> submitOption(v, index, expectedStep));
         return option;
     }

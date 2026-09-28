@@ -89,9 +89,18 @@ public final class MainActivity extends FragmentActivity {
     private boolean scheduleListenerRegistered;
     private boolean statusListenerRegistered;
     private ScrollView mainScroll;
+    private DayOverview dayOverview;
+    private RemoteStore.Config agendaConfig;
+    private boolean todayOnly;
     private final Map<TextView, RemoteStore.Schedule> statusPills = new HashMap<>();
     private RemoteStore.Config optimisticConfig;
     private final Handler dayRolloverHandler = new Handler(Looper.getMainLooper());
+    private final Runnable overviewTick = new Runnable() {
+        @Override public void run() {
+            if (dayOverview != null) dayOverview.bind(agendaConfig);
+            dayRolloverHandler.postDelayed(this, 60_000L);
+        }
+    };
     private final Runnable dayRollover = () -> {
         ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
         render();
@@ -147,6 +156,8 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onResume() {
         super.onResume();
+        dayRolloverHandler.removeCallbacks(overviewTick);
+        dayRolloverHandler.postDelayed(overviewTick, 60_000L);
         scheduleDayRollover();
         if (sync != null) {
             ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
@@ -156,6 +167,7 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onPause() {
         dayRolloverHandler.removeCallbacks(dayRollover);
+        dayRolloverHandler.removeCallbacks(overviewTick);
         super.onPause();
     }
 
@@ -181,6 +193,7 @@ public final class MainActivity extends FragmentActivity {
 
     @Override protected void onDestroy() {
         dayRolloverHandler.removeCallbacks(dayRollover);
+        dayRolloverHandler.removeCallbacks(overviewTick);
         if (sync != null) sync.stop();
         if (phoneLogin != null) phoneLogin.clear();
         super.onDestroy();
@@ -204,77 +217,80 @@ public final class MainActivity extends FragmentActivity {
             renderLogin();
             return;
         }
+        renderHome(config);
+    }
+
+    private void renderHome(RemoteStore.Config config) {
         statusPills.clear();
+        agendaConfig = config;
         int previousScrollY = mainScroll == null ? 0 : mainScroll.getScrollY();
         LinearLayout page = new LinearLayout(this);
         page.setOrientation(LinearLayout.VERTICAL);
         page.setBackgroundColor(Ui.BG);
-        // Keep elevated schedule cards inside their scrolling viewport. Without clipping,
-        // a card scrolled above the viewport is still drawn over the fixed home header.
         page.setClipChildren(true);
-        page.setClipToPadding(true);
-        page.addView(buildHomeHeader(), new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        page.addView(buildHomeHeader(), Ui.matchWrap());
 
         ScrollView scroll = new ScrollView(this);
-        scroll.setClipChildren(true);
-        scroll.setClipToPadding(true);
+        scroll.setVerticalScrollBarEnabled(false);
         scroll.setFillViewport(true);
         LinearLayout body = new LinearLayout(this);
         body.setOrientation(LinearLayout.VERTICAL);
-        body.setPadding(Ui.dp(this, 20), Ui.dp(this, 16), Ui.dp(this, 20), Ui.dp(this, 32));
-        body.setClipChildren(false);
-        body.setClipToPadding(false);
-        Ui.safeArea(body, true, false, true, true);
-
+        body.setPadding(Ui.dp(this, 18), Ui.dp(this, 4), Ui.dp(this, 18), Ui.dp(this, 12));
+        Ui.safeArea(body, true, false, true, false);
+        dayOverview = new DayOverview(this, dailyCallStatus, reminder -> showScheduleDialog(config, reminder));
+        dayOverview.bind(config);
+        body.addView(dayOverview, Ui.matchWrap());
         addPermissionButton(body);
-        addSchedules(body, config);
 
+        body.addView(Ui.text(this, "Your reminders", 17, Ui.INK, true));
+        LinearLayout filters = new LinearLayout(this);
+        filters.setPadding(Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4), Ui.dp(this, 4));
+        filters.setBackground(Ui.rounded(Ui.RAISED, 14, this));
+        for (int i = 0; i < 2; i++) {
+            final boolean onlyToday = i == 1;
+            TextView filter = Ui.text(this, onlyToday ? "Today only" : "All reminders", 13,
+                    todayOnly == onlyToday ? Ui.ACCENT : Ui.MUTED, true);
+            filter.setGravity(Gravity.CENTER);
+            filter.setSelected(todayOnly == onlyToday);
+            filter.setBackground(Ui.rounded(todayOnly == onlyToday ? Ui.WHITE : Color.TRANSPARENT, 11, this));
+            filter.setOnClickListener(v -> { todayOnly = onlyToday; renderHome(config); });
+            filters.addView(filter, new LinearLayout.LayoutParams(0, Ui.dp(this, 34), 1));
+        }
+        body.addView(filters, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 7, 0, 12));
+        addSchedules(body, config);
         scroll.addView(body);
-        page.addView(scroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1));
+        page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
         mainScroll = scroll;
+
+        LinearLayout dock = new LinearLayout(this);
+        dock.setPadding(Ui.dp(this, 18), Ui.dp(this, 6), Ui.dp(this, 18), Ui.dp(this, 6));
+        dock.setBackgroundColor(Ui.BG);
+        Ui.safeArea(dock, true, false, true, true);
+        Button add = button("+  " + AppLanguage.ui(this, "Add reminder"), Ui.ACCENT, Ui.WHITE);
+        add.setContentDescription(AppLanguage.ui(this, "Add reminder"));
+        add.setOnClickListener(v -> showScheduleDialog(config, null));
+        dock.addView(add, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 46)));
+        page.addView(dock);
         setContentView(page);
-        scroll.post(() -> scroll.scrollTo(0, previousScrollY));
+        scroll.post(() -> { if (mainScroll == scroll) scroll.scrollTo(0, previousScrollY); });
     }
 
     private View buildHomeHeader() {
         LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.setPadding(Ui.dp(this, 20), Ui.dp(this, 14), Ui.dp(this, 20), Ui.dp(this, 14));
-        header.setBackgroundColor(Ui.BG);
-        header.setClipChildren(false);
-        header.setClipToPadding(false);
-        header.setElevation(Ui.dp(this, 3));
+        header.setPadding(Ui.dp(this, 18), Ui.dp(this, 4), Ui.dp(this, 18), Ui.dp(this, 4));
         Ui.safeArea(header, true, true, true, false);
+        View mark = new View(this);
+        mark.setBackground(Ui.reminderMark());
+        header.addView(mark, new LinearLayout.LayoutParams(Ui.dp(this, 30), Ui.dp(this, 30)));
+        TextView brand = Ui.text(this, AppLanguage.title(currentLanguage()), 18, Ui.INK, true);
+        LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
+        brandParams.setMarginStart(Ui.dp(this, 10));
+        header.addView(brand, brandParams);
         View profile = profileButton();
         profile.setOnClickListener(this::showProfileMenu);
-        LinearLayout.LayoutParams profileParams = new LinearLayout.LayoutParams(
-                Ui.dp(this, 44), Ui.dp(this, 44));
-        profileParams.setMarginEnd(Ui.dp(this, 10));
-        header.addView(profile, profileParams);
-
-        LinearLayout words = new LinearLayout(this);
-        words.setOrientation(LinearLayout.VERTICAL);
-        words.addView(Ui.text(this, AppLanguage.title(currentLanguage()), 20, Ui.INK, true));
-        RemoteStore.Config config = optimisticConfig != null
-                ? optimisticConfig : remoteStore == null ? null : remoteStore.load();
-        header.addView(words, new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
-        TextView add = Ui.text(this, "+", 25, Ui.INK, false);
-        add.setGravity(Gravity.CENTER);
-        add.setIncludeFontPadding(false);
-        add.setPadding(0, 0, 0, 0);
-        add.setBackground(Ui.circle(Ui.GOLD));
-        add.setClickable(true);
-        add.setFocusable(true);
-        add.setContentDescription("Add reminder");
-        add.setOnClickListener(v -> showScheduleDialog(config, null));
-        LinearLayout.LayoutParams addParams = new LinearLayout.LayoutParams(
-                Ui.dp(this, 44), Ui.dp(this, 44));
-        addParams.setMarginEnd(Ui.dp(this, 10));
-        header.addView(add, addParams);
+        header.addView(profile, new LinearLayout.LayoutParams(Ui.dp(this, 44), Ui.dp(this, 44)));
         return header;
     }
 
@@ -283,18 +299,11 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private View profileButton() {
-        FrameLayout host = new FrameLayout(this);
-        host.setBackground(Ui.roundedWithStroke(Ui.RAISED, 22, Ui.LINE, 1, this));
-        host.setElevation(Ui.dp(this, 2));
-        host.setContentDescription(AppLanguage.ui(this, "Language"));
-        ImageView icon = new ImageView(this);
-        icon.setImageResource(R.mipmap.ic_launcher);
-        icon.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        int padding = Ui.dp(this, 6);
-        icon.setPadding(padding, padding, padding, padding);
-        host.addView(icon, new FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        return host;
+        TextView profile = Ui.text(this, "•••", 16, Ui.ACCENT, true);
+        profile.setGravity(Gravity.CENTER);
+        profile.setBackground(Ui.rounded(Ui.PRIMARY, 16, this));
+        profile.setContentDescription(AppLanguage.ui(this, "Language and account"));
+        return profile;
     }
 
     private void showProfileMenu(View anchor) {
@@ -360,6 +369,8 @@ public final class MainActivity extends FragmentActivity {
 
     private void renderLogin() {
         mainScroll = null;
+        dayOverview = null;
+        agendaConfig = null;
         statusPills.clear();
         optimisticConfig = null;
         getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING);
@@ -379,11 +390,15 @@ public final class MainActivity extends FragmentActivity {
         root.addView(screen, new android.widget.FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
 
-        TextView brand = Ui.text(this, AppLanguage.title(currentLanguage()), 30, Ui.INK, true);
+        View identity = new View(this);
+        identity.setBackground(Ui.reminderMark());
+        screen.addView(identity, new LinearLayout.LayoutParams(Ui.dp(this, 68), Ui.dp(this, 68)));
+        screen.addView(Ui.spacer(this, 22));
+        TextView brand = Ui.text(this, AppLanguage.title(currentLanguage()), 32, Ui.INK, true);
         brand.setGravity(Gravity.CENTER);
         screen.addView(brand, Ui.matchWrap());
         TextView intro = Ui.text(this,
-                AppLanguage.ui(this, "Your reminders. Your scheduled calls."),
+                AppLanguage.ui(this, "A calmer way to remember."),
                 15, Ui.MUTED, false);
         intro.setGravity(Gravity.CENTER);
         screen.addView(intro, spaced(0, 7, 0, 0));
@@ -394,8 +409,8 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout card = new LinearLayout(this);
         card.setOrientation(LinearLayout.VERTICAL);
         card.setPadding(Ui.dp(this, 20), Ui.dp(this, 20), Ui.dp(this, 20), Ui.dp(this, 20));
-        card.setBackground(Ui.roundedWithStroke(Ui.RAISED, 20, Ui.LINE, 1, this));
-        card.setElevation(Ui.dp(this, 2));
+        card.setBackground(Ui.rounded(Ui.WHITE, 26, this));
+        card.setElevation(0);
         card.setClipChildren(false);
         card.setClipToPadding(false);
         screen.addView(card, spaced(2, 24, 2, 4));
@@ -646,99 +661,96 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void addSchedules(LinearLayout body, RemoteStore.Config config) {
-        if (config == null || config.schedules.isEmpty()) {
-            body.addView(Ui.text(this, "No reminders yet. Tap + to create one.",
-                    16, Ui.MUTED, false));
+        List<RemoteStore.Schedule> visible = new ArrayList<>();
+        long now = System.currentTimeMillis();
+        if (config != null) for (RemoteStore.Schedule item : config.schedules) {
+            if (item.enabled && (!todayOnly || DayOverview.scheduledToday(item, now))) visible.add(item);
+        }
+        visible.sort(Comparator.comparingInt(item -> item.hour * 60 + item.minute));
+        if (visible.isEmpty()) {
+            TextView empty = Ui.text(this, todayOnly ? "No reminders scheduled today." : "No reminders yet. Tap + to create one.",
+                    16, Ui.MUTED, false);
+            empty.setPadding(0, Ui.dp(this, 28), 0, Ui.dp(this, 32));
+            body.addView(empty);
             return;
         }
-        List<RemoteStore.Schedule> visibleSchedules = new ArrayList<>();
-        for (RemoteStore.Schedule schedule : config.schedules) {
-            if (schedule.enabled) visibleSchedules.add(schedule);
-        }
-        visibleSchedules.sort(Comparator.comparingInt(
-                schedule -> schedule.hour * 60 + schedule.minute));
-
-        String currentPeriod = "";
-        for (RemoteStore.Schedule schedule : visibleSchedules) {
-            String period = periodIcon(schedule.hour, schedule.minute) + "  "
-                    + AppLanguage.timePeriod(currentLanguage(), schedule.hour, schedule.minute);
-            if (!period.equals(currentPeriod)) {
-                TextView label = Ui.text(this, period, 12, Ui.MUTED, true);
-                LinearLayout.LayoutParams labelParams = Ui.matchWrap();
-                labelParams.leftMargin = Ui.dp(this, 6);
-                labelParams.topMargin = currentPeriod.isEmpty() ? 0 : Ui.dp(this, 8);
-                labelParams.bottomMargin = Ui.dp(this, 2);
-                body.addView(label, labelParams);
-                currentPeriod = period;
+        String period = "";
+        for (RemoteStore.Schedule schedule : visible) {
+            String nextPeriod = AppLanguage.timePeriod(currentLanguage(), schedule.hour, schedule.minute);
+            if (!nextPeriod.equals(period)) {
+                TextView section = Ui.text(this, nextPeriod, 12, Ui.ACCENT, true);
+                body.addView(section, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, period.isEmpty() ? 0 : 12, 0, 4));
+                period = nextPeriod;
             }
-            LinearLayout card = new LinearLayout(this);
-            card.setOrientation(LinearLayout.HORIZONTAL);
-            card.setGravity(Gravity.CENTER_VERTICAL);
-            card.setMinimumHeight(Ui.dp(this, 76));
-            card.setPadding(Ui.dp(this, 14), Ui.dp(this, 12),
-                    Ui.dp(this, 12), Ui.dp(this, 12));
-            card.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 15, Ui.LINE, 1, this));
-            card.setElevation(Ui.dp(this, 2));
-
-            View icon = categoryIconView(schedule.category);
-            LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                    Ui.dp(this, 40), Ui.dp(this, 40));
-            iconParams.setMarginEnd(Ui.dp(this, 12));
-            card.addView(icon, iconParams);
-
+            LinearLayout row = new LinearLayout(this);
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setClipChildren(true);
+            row.setOnClickListener(v -> showScheduleDialog(config, schedule));
+            row.setContentDescription("Edit " + schedule.label + " at " + timeText(schedule));
+            LinearLayout when = new LinearLayout(this);
+            when.setOrientation(LinearLayout.VERTICAL);
+            when.setGravity(Gravity.CENTER_VERTICAL);
+            Calendar time = Calendar.getInstance();
+            time.set(Calendar.HOUR_OF_DAY, schedule.hour);
+            time.set(Calendar.MINUTE, schedule.minute);
+            boolean clock24 = android.text.format.DateFormat.is24HourFormat(this);
+            TextView hour = Ui.text(this, new java.text.SimpleDateFormat(clock24 ? "HH:mm" : "h:mm",
+                    AppLanguage.locale(currentLanguage())).format(time.getTime()), 17, Ui.INK, true);
+            hour.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
+            hour.setSingleLine(true);
+            hour.setAutoSizeTextTypeUniformWithConfiguration(12, 17, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
+            when.addView(hour);
+            if (!clock24) when.addView(Ui.text(this, new java.text.SimpleDateFormat("a",
+                    AppLanguage.locale(currentLanguage())).format(time.getTime()).toLowerCase(AppLanguage.locale(currentLanguage())),
+                    11, Ui.MUTED, false));
+            row.addView(when, new LinearLayout.LayoutParams(Ui.dp(this, 46), ViewGroup.LayoutParams.MATCH_PARENT));
+            FrameLayout rail = new FrameLayout(this);
+            View line = new View(this);
+            line.setBackgroundColor(Ui.LINE);
+            FrameLayout.LayoutParams lineParams = new FrameLayout.LayoutParams(Ui.dp(this, 1), ViewGroup.LayoutParams.MATCH_PARENT, Gravity.CENTER_HORIZONTAL);
+            rail.addView(line, lineParams);
+            View dot = new View(this);
+            dot.setBackground(Ui.circle(Ui.ACCENT));
+            FrameLayout.LayoutParams dotParams = new FrameLayout.LayoutParams(Ui.dp(this, 7), Ui.dp(this, 7), Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+            dotParams.topMargin = Ui.dp(this, 27);
+            rail.addView(dot, dotParams);
+            row.addView(rail, new LinearLayout.LayoutParams(Ui.dp(this, 12), ViewGroup.LayoutParams.MATCH_PARENT));
+            LinearLayout content = new LinearLayout(this);
+            content.setOrientation(LinearLayout.HORIZONTAL);
+            content.setGravity(Gravity.CENTER_VERTICAL);
+            content.setMinimumHeight(Ui.dp(this, 66));
+            content.setPadding(Ui.dp(this, 10), Ui.dp(this, 8), 0, Ui.dp(this, 8));
             LinearLayout words = new LinearLayout(this);
             words.setOrientation(LinearLayout.VERTICAL);
-            words.addView(Ui.text(this, schedule.label, 15, Ui.INK, true));
-            String meta = categoryName(schedule.category) + " · " + daysText(schedule.days)
-                    + ("medicine".equals(schedule.category) && schedule.preMinutes > 0
-                    ? " · meal call " + schedule.preMinutes + " min before" : "")
-                    + " · " + (schedule.textReminder() ? "Reminder" : "Call");
-            words.addView(Ui.text(this, meta, 11, Ui.MUTED, false));
-            LinearLayout.LayoutParams wordsParams = new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            wordsParams.setMarginEnd(Ui.dp(this, 8));
-            card.addView(words, wordsParams);
-
-            LinearLayout trailing = new LinearLayout(this);
-            trailing.setOrientation(LinearLayout.VERTICAL);
-            trailing.setGravity(Gravity.END);
-            TextView time = Ui.text(this, timeText(schedule), 16, Ui.INK, true);
-            time.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-            trailing.addView(time);
-            DailyCallStatus.Display display = dailyCallStatus.display(
-                    schedule, System.currentTimeMillis());
-            TextView statusTag = (TextView) statusPill(schedule, display.kind);
-            trailing.addView(statusTag, Ui.margins(
-                    ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 22),
-                    this, 0, 3, 0, 0));
-            int statusWidth = (int) Math.ceil(statusTag.getPaint().measureText(
-                    DailyCallStatus.skippedLabel(currentLanguage()))) + Ui.dp(this, 14);
-            LinearLayout.LayoutParams trailingParams = new LinearLayout.LayoutParams(
-                    Math.max(Ui.dp(this, 92), statusWidth), ViewGroup.LayoutParams.WRAP_CONTENT);
-            trailingParams.setMarginEnd(Ui.dp(this, 10));
-            card.addView(trailing, trailingParams);
-
-            card.addView(Ui.text(this, "›", 24, Ui.GOLD, false));
-            card.setOnClickListener(v -> showScheduleDialog(config, schedule));
-            card.setContentDescription("Edit " + schedule.label + " at " + timeText(schedule));
-            LinearLayout.LayoutParams params = Ui.matchWrap();
-            params.leftMargin = Ui.dp(this, 3);
-            params.rightMargin = Ui.dp(this, 3);
-            params.topMargin = Ui.dp(this, 4);
-            params.bottomMargin = Ui.dp(this, 6);
-            body.addView(card, params);
-        }
-        if (visibleSchedules.isEmpty()) {
-            body.addView(Ui.text(this, "No active reminders.",
-                    16, Ui.MUTED, false));
+            TextView name = Ui.text(this, schedule.label, 15, Ui.INK, true);
+            name.setMaxLines(2);
+            name.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            words.addView(name);
+            String metadata = categoryName(schedule.category) + " · "
+                    + AppLanguage.ui(this, schedule.textReminder() ? "Reminder" : "Call");
+            TextView detail = Ui.text(this, metadata, 10, Ui.MUTED, false);
+            detail.setSingleLine(true);
+            detail.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            words.addView(detail);
+            if (schedule.days != 127) words.addView(Ui.text(this, daysText(schedule.days), 10, Ui.MUTED, false));
+            content.addView(words, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            TextView tag = (TextView) statusPill(schedule, dailyCallStatus.display(schedule, now).kind);
+            tag.setSingleLine(false);
+            tag.setMaxLines(2);
+            tag.setMaxWidth(Ui.dp(this, 116));
+            tag.setEllipsize(android.text.TextUtils.TruncateAt.END);
+            content.addView(tag, Ui.margins(ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 40), this, 6, 0, 0, 0));
+            row.addView(content, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            body.addView(row, Ui.matchWrap());
         }
     }
 
     private View statusPill(RemoteStore.Schedule schedule, String kind) {
-        TextView pill = Ui.text(this, "", 9, Color.rgb(83, 99, 116), true);
+        TextView pill = Ui.text(this, "", 11, Ui.MUTED, true);
         pill.setGravity(Gravity.CENTER);
         pill.setSingleLine(true);
-        pill.setPadding(Ui.dp(this, 7), 0, Ui.dp(this, 7), 0);
+        pill.setPadding(Ui.dp(this, 8), 0, Ui.dp(this, 8), 0);
         pill.setClickable(true);
         pill.setOnClickListener(v -> showDailyStatusDialog(schedule));
         updateStatusPill(pill, schedule, kind);
@@ -748,6 +760,7 @@ public final class MainActivity extends FragmentActivity {
 
     private void refreshDailyStatusPills() {
         long now = System.currentTimeMillis();
+        if (dayOverview != null) dayOverview.bind(agendaConfig);
         for (Map.Entry<TextView, RemoteStore.Schedule> entry : statusPills.entrySet()) {
             RemoteStore.Schedule schedule = entry.getValue();
             updateStatusPill(entry.getKey(), schedule, dailyCallStatus.display(schedule, now).kind);
@@ -762,15 +775,15 @@ public final class MainActivity extends FragmentActivity {
                 : DailyCallStatus.NOT_TODAY.equals(kind)
                 ? DailyCallStatus.notTodayLabel(currentLanguage())
                 : DailyCallStatus.pendingLabel(currentLanguage());
-        int ink = completed ? Color.rgb(38, 117, 72)
+        int ink = completed ? Ui.ACCEPT
                 : skipped ? Ui.DANGER
-                : Color.rgb(83, 99, 116);
-        int background = completed ? Color.rgb(226, 245, 233)
+                : Ui.MUTED;
+        int background = completed ? Ui.ACCEPT_LIGHT
                 : skipped ? Color.rgb(253, 235, 237)
-                : Color.rgb(232, 239, 245);
+                : Ui.RAISED;
         pill.setText(label);
         pill.setTextColor(ink);
-        pill.setBackground(Ui.rounded(background, 11, this));
+        pill.setBackground(Ui.rounded(background, 10, this));
         pill.setContentDescription(label + ". Change today's status for " + schedule.label);
     }
 
@@ -834,13 +847,15 @@ public final class MainActivity extends FragmentActivity {
 
     private View dailyStatusControls(RemoteStore.Schedule schedule, Runnable changed) {
         LinearLayout choices = new LinearLayout(this);
+        choices.setOrientation(LinearLayout.VERTICAL);
         String[] labels = {DailyCallStatus.pendingLabel(currentLanguage()),
                 DailyCallStatus.completedLabel(currentLanguage()),
                 AppLanguage.ui(currentLanguage(), "Skip for today")};
-        int[] colors = {Color.rgb(83, 99, 116), Color.rgb(38, 117, 72), Ui.DANGER};
-        int[] backgrounds = {Color.rgb(232, 239, 245), Color.rgb(226, 245, 233),
-                Color.rgb(253, 235, 237)};
-        TextView[] controls = new TextView[3];
+        String[] hints = {"Keep this on today's list", "Mark today's reminder done", "Resume on the next scheduled day"};
+        int[] colors = {Ui.ACCENT, Ui.ACCEPT, Ui.DANGER};
+        int[] backgrounds = {Ui.PRIMARY, Ui.ACCEPT_LIGHT, Color.rgb(251, 234, 239)};
+        LinearLayout[] controls = new LinearLayout[3];
+        TextView[] checks = new TextView[3];
         Runnable update = () -> {
             String kind = dailyCallStatus.display(schedule, System.currentTimeMillis()).kind;
             int selected = DailyCallStatus.COMPLETED.equals(kind) ? 1
@@ -848,17 +863,27 @@ public final class MainActivity extends FragmentActivity {
                     : DailyCallStatus.NOT_TODAY.equals(kind) ? -1 : 0;
             for (int i = 0; i < controls.length; i++) {
                 controls[i].setSelected(i == selected);
-                controls[i].setBackground(Ui.roundedWithStroke(backgrounds[i], 12,
-                        i == selected ? colors[i] : Ui.LINE, 1, this));
+                controls[i].setBackground(Ui.roundedWithStroke(i == selected ? backgrounds[i] : Ui.BG,
+                        16, i == selected ? colors[i] : Ui.BG, 1, this));
+                checks[i].setText(i == selected ? "✓" : "○");
             }
         };
         for (int index = 0; index < controls.length; index++) {
             int choice = index;
-            TextView control = Ui.text(this, labels[index], 12, colors[index], true);
-            control.setGravity(Gravity.CENTER);
-            control.setPadding(Ui.dp(this, 5), Ui.dp(this, 6), Ui.dp(this, 5), Ui.dp(this, 6));
-            control.setMinHeight(Ui.dp(this, 48));
+            LinearLayout control = new LinearLayout(this);
+            control.setGravity(Gravity.CENTER_VERTICAL);
+            control.setPadding(Ui.dp(this, 16), Ui.dp(this, 12), Ui.dp(this, 16), Ui.dp(this, 12));
+            control.setMinimumHeight(Ui.dp(this, 66));
             control.setContentDescription("Today's status: " + labels[index]);
+            LinearLayout words = new LinearLayout(this);
+            words.setOrientation(LinearLayout.VERTICAL);
+            words.addView(Ui.text(this, labels[index], 15, colors[index], true));
+            words.addView(Ui.text(this, hints[index], 12, Ui.MUTED, false));
+            control.addView(words, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1));
+            TextView check = Ui.text(this, "○", 23, colors[index], true);
+            check.setGravity(Gravity.CENTER);
+            control.addView(check, new LinearLayout.LayoutParams(Ui.dp(this, 36), Ui.dp(this, 36)));
+            checks[index] = check;
             control.setOnClickListener(v -> {
                 if (choice == 0) {
                     dailyCallStatus.markPending(schedule.id);
@@ -886,10 +911,8 @@ public final class MainActivity extends FragmentActivity {
                 changed.run();
             });
             controls[index] = control;
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-            if (index > 0) params.setMarginStart(Ui.dp(this, 6));
-            choices.addView(control, params);
+            choices.addView(control, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, index == 0 ? 0 : 8, 0, 0));
         }
         update.run();
         return choices;
@@ -931,7 +954,7 @@ public final class MainActivity extends FragmentActivity {
         if (existing != null) {
             Button delete = button("Delete", Ui.RAISED2, Ui.DANGER);
             delete.setTextSize(12);
-            delete.setElevation(Ui.dp(this, 3));
+            delete.setElevation(0);
             delete.setOnClickListener(v -> new AlertDialog.Builder(this)
                     .setTitle("Delete reminder?")
                     .setMessage(existing.label + " reminders will stop.")
@@ -951,6 +974,7 @@ public final class MainActivity extends FragmentActivity {
         TextView close = Ui.text(this, "×", 26, Ui.MUTED, false);
         close.setGravity(Gravity.CENTER);
         close.setBackground(Ui.rounded(Ui.RAISED2, 21, this));
+        close.setContentDescription("Close reminder editor");
         close.setOnClickListener(v -> dialog.dismiss());
         LinearLayout.LayoutParams closeParams = new LinearLayout.LayoutParams(
                 Ui.dp(this, 42), Ui.dp(this, 42));
@@ -960,11 +984,11 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
-        form.setPadding(0, Ui.dp(this, 4), 0, Ui.dp(this, 6));
+        form.setPadding(0, Ui.dp(this, 20), 0, Ui.dp(this, 24));
         form.setClipChildren(false);
         form.setClipToPadding(false);
 
-        form.addView(fieldLabel("Category"));
+        TextView categoryLabel = fieldLabel("Category");
         Runnable[] updateCategoryUi = new Runnable[1];
         int[] selectedCategory = {categoryIndex(draft.category)};
         LinearLayout[] categoryChoices = new LinearLayout[CATEGORY_VALUES.length];
@@ -975,6 +999,7 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout categoryRow = new LinearLayout(this);
         categoryRow.setOrientation(LinearLayout.HORIZONTAL);
         categoryRow.setGravity(Gravity.CENTER_VERTICAL);
+        categoryRow.setPadding(Ui.dp(this, 18), 0, Ui.dp(this, 18), 0);
         for (int index = 0; index < CATEGORY_VALUES.length; index++) {
             final int choice = index;
             LinearLayout option = categoryChoice(CATEGORY_VALUES[index],
@@ -993,25 +1018,28 @@ public final class MainActivity extends FragmentActivity {
             });
             categoryChoices[index] = option;
             LinearLayout.LayoutParams optionParams = new LinearLayout.LayoutParams(
-                    Ui.dp(this, 76), ViewGroup.LayoutParams.WRAP_CONTENT);
+                    ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 42));
+            optionParams.setMarginEnd(Ui.dp(this, 8));
             categoryRow.addView(option, optionParams);
         }
         categoryScroll.addView(categoryRow);
         LinearLayout.LayoutParams categoryScrollParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 70));
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 48));
         categoryScrollParams.setMargins(-Ui.dp(this, 18), Ui.dp(this, 2),
                 -Ui.dp(this, 18), 0);
-        form.addView(categoryScroll, categoryScrollParams);
+        categoryScroll.post(() -> categoryScroll.scrollTo(
+                Math.max(0, categoryChoices[selectedCategory[0]].getLeft() - Ui.dp(this, 18)), 0));
 
         TextView reminderNameLabel = fieldLabel("Medicine name");
         form.addView(reminderNameLabel, sizedMargins(ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 8, 0, 0));
+                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 0, 0, 0));
         EditText medicine = new EditText(this);
         medicine.setHint("Example: Metformin");
         medicine.setText("medicine".equals(draft.category)
                 ? normalizeMedicineName(draft.label) : draft.label);
         medicine.setSingleLine(true);
-        medicine.setTextSize(17);
+        medicine.setTextSize(23);
+        medicine.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
         medicine.setTextColor(Ui.INK);
         medicine.setHintTextColor(Ui.MUTED);
         medicine.setFilters(new InputFilter[]{new InputFilter.LengthFilter(80)});
@@ -1019,14 +1047,18 @@ public final class MainActivity extends FragmentActivity {
         medicine.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         medicine.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 14, Ui.LINE, 1, this));
         form.addView(medicine, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
-                Ui.dp(this, 48), 0, 4, 0, 0));
+                Ui.dp(this, 64), 0, 6, 0, 0));
+        form.addView(categoryLabel, sizedMargins(ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 18, 0, 6));
+        form.addView(categoryScroll, categoryScrollParams);
 
         form.addView(fieldLabel("Time & mode"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                0, 8, 0, 4));
+                0, 18, 0, 8));
         int[] selectedTime = {draft.hour, draft.minute};
         Button time = button(timeText(draft), Ui.RAISED2, Ui.INK);
-        time.setTextSize(17);
+        time.setTextSize(23);
+        time.setTypeface(Typeface.create("sans-serif-condensed", Typeface.BOLD));
         time.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 14, Ui.LINE, 1, this));
         time.setElevation(0);
         time.setTranslationZ(0);
@@ -1041,7 +1073,7 @@ public final class MainActivity extends FragmentActivity {
         }, selectedTime[0], selectedTime[1], false).show());
         LinearLayout modeRow = new LinearLayout(this);
         modeRow.setGravity(Gravity.CENTER_VERTICAL);
-        modeRow.addView(time, new LinearLayout.LayoutParams(0, Ui.dp(this, 48), 1.3f));
+        modeRow.addView(time, new LinearLayout.LayoutParams(0, Ui.dp(this, 60), 1.3f));
         TextView[] modeChips = new TextView[2];
         String[] modes = {"call", "reminder"};
         for (int index = 0; index < modes.length; index++) {
@@ -1057,7 +1089,7 @@ public final class MainActivity extends FragmentActivity {
             });
             modeChips[index] = option;
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, Ui.dp(this, 48), 1f);
+                    0, Ui.dp(this, 60), 1f);
             params.setMarginStart(Ui.dp(this, 6));
             modeRow.addView(option, params);
         }
@@ -1065,15 +1097,17 @@ public final class MainActivity extends FragmentActivity {
 
         form.addView(fieldLabel("Repeat on"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                0, 8, 0, 4));
+                0, 18, 0, 8));
         String[] dayNames = AppLanguage.shortDays(currentLanguage());
         TextView[] days = new TextView[7];
         LinearLayout dayRow = new LinearLayout(this);
         for (int index = 0; index < dayNames.length; index++) {
             TextView chip = chip(dayNames[index], (draft.days & (1 << index)) != 0);
+            chip.setSingleLine(true);
+            chip.setAutoSizeTextTypeUniformWithConfiguration(8, 12, 1, android.util.TypedValue.COMPLEX_UNIT_SP);
             days[index] = chip;
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, Ui.dp(this, 34), 1f);
+                    0, Ui.dp(this, 42), 1f);
             if (index < 6) params.setMarginEnd(Ui.dp(this, 4));
             dayRow.addView(chip, params);
         }
@@ -1083,7 +1117,7 @@ public final class MainActivity extends FragmentActivity {
         medicineOptions.setOrientation(LinearLayout.VERTICAL);
         medicineOptions.addView(fieldLabel("Meal Reminder"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                0, 8, 0, 4));
+                0, 18, 0, 8));
         int[] leadValues = {0, 15, 30, 45, 60};
         int[] selectedLead = {draft.preMinutes};
         TextView[] leadChips = new TextView[leadValues.length];
@@ -1098,7 +1132,7 @@ public final class MainActivity extends FragmentActivity {
             });
             leadChips[index] = chip;
             LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, Ui.dp(this, 34), 1f);
+                    0, Ui.dp(this, 42), 1f);
             if (index < leadValues.length - 1) params.setMarginEnd(Ui.dp(this, 6));
             leadRow.addView(chip, params);
         }
@@ -1109,12 +1143,12 @@ public final class MainActivity extends FragmentActivity {
         conversation.setOrientation(LinearLayout.VERTICAL);
         conversation.addView(fieldLabel("Questions & answers"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                0, 8, 0, 4));
-        Button conversationButton = button("", Ui.ACCEPT_LIGHT, Ui.INK);
+                0, 18, 0, 8));
+        Button conversationButton = button("", Ui.PRIMARY, Ui.ACCENT);
         conversationButton.setGravity(Gravity.CENTER_VERTICAL | Gravity.START);
         conversationButton.setPadding(Ui.dp(this, 16), 0, Ui.dp(this, 16), 0);
         conversationButton.setBackground(Ui.roundedWithStroke(
-                Ui.ACCEPT_LIGHT, 14, Ui.ACCEPT, 1, this));
+                Ui.PRIMARY, 14, Ui.PRIMARY, 1, this));
         conversationButton.setElevation(0);
         conversationButton.setTranslationZ(0);
         conversationButton.setStateListAnimator(null);
@@ -1129,16 +1163,20 @@ public final class MainActivity extends FragmentActivity {
 
         updateCategoryUi[0] = () -> {
             boolean isMedicine = "medicine".equals(draft.category);
-            reminderNameLabel.setText(isMedicine ? "Medicine name" : "Reminder title");
-            medicine.setHint(isMedicine ? "Example: Metformin" : "Example: Pay electricity bill");
+            reminderNameLabel.setText(AppLanguage.ui(this, isMedicine ? "Medicine name" : "Reminder title"));
+            medicine.setHint(AppLanguage.ui(this, isMedicine ? "Example: Metformin" : "Example: Pay electricity bill"));
             medicineOptions.setVisibility(isMedicine ? View.VISIBLE : View.GONE);
             conversation.setVisibility(View.VISIBLE);
             updateConversationSummary(conversationButton, draft);
         };
         updateCategoryUi[0].run();
 
-        sheet.addView(form, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        ScrollView editorScroll = new ScrollView(this);
+        editorScroll.setVerticalScrollBarEnabled(false);
+        editorScroll.setFillViewport(false);
+        editorScroll.addView(form);
+        sheet.addView(editorScroll, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
 
         Button save = button(existing == null ? "Add reminder" : "Save changes",
                 Ui.GOLD, Ui.INK);
@@ -1187,20 +1225,7 @@ public final class MainActivity extends FragmentActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 52)));
 
         dialog.setContentView(sheet);
-        Window window = dialog.getWindow();
-        if (window != null) {
-            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
-            window.setGravity(Gravity.BOTTOM);
-            window.setDimAmount(0.48f);
-            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
-            window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
-            window.setNavigationBarColor(Ui.BG);
-            applyLightSystemBars(window);
-            window.setWindowAnimations(R.style.BottomSheetAnimation);
-        }
-        dialog.show();
-        if (window != null) window.setLayout(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        showSheet(dialog, .92f);
     }
 
     private void saveOwnSchedules(RemoteStore.Config config) {
@@ -1303,42 +1328,22 @@ public final class MainActivity extends FragmentActivity {
 
     private LinearLayout categoryChoice(String category, boolean selected) {
         LinearLayout choice = new LinearLayout(this);
-        choice.setOrientation(LinearLayout.VERTICAL);
-        choice.setGravity(Gravity.CENTER_HORIZONTAL);
-        choice.setPadding(Ui.dp(this, 2), 0, Ui.dp(this, 2), 0);
+        choice.setGravity(Gravity.CENTER_VERTICAL);
+        choice.setPadding(Ui.dp(this, 14), 0, Ui.dp(this, 14), 0);
         choice.setClickable(true);
         choice.setFocusable(true);
-
-        View icon = categoryIconView(category);
-        choice.addView(icon, new LinearLayout.LayoutParams(
-                Ui.dp(this, 46), Ui.dp(this, 46)));
-
-        TextView name = Ui.text(this, categoryName(category), 11, Ui.MUTED, false);
-        name.setGravity(Gravity.CENTER);
-        name.setSingleLine(true);
-        choice.addView(name, sizedMargins(ViewGroup.LayoutParams.WRAP_CONTENT,
-                Ui.dp(this, 22), 0, 3, 0, 0));
-        choice.setTag(new View[]{icon, name});
+        TextView name = Ui.text(this, categoryName(category), 12, Ui.MUTED, true);
+        choice.addView(name);
+        choice.setTag(name);
         styleCategoryChoice(choice, selected);
         return choice;
     }
 
     private void styleCategoryChoice(LinearLayout choice, boolean selected) {
-        if (choice == null || !(choice.getTag() instanceof View[])) return;
-        View[] parts = (View[]) choice.getTag();
-        View icon = parts[0];
-        TextView name = (TextView) parts[1];
-        icon.setBackground(Ui.roundedWithStroke(
-                selected ? Ui.GOLD : Ui.RAISED2,
-                23,
-                selected ? Color.rgb(211, 169, 91) : Ui.LINE,
-                selected ? 2 : 1,
-                this));
-        icon.setElevation(selected ? Ui.dp(this, 2) : 0);
-        name.setTextColor(selected ? Ui.INK : Ui.MUTED);
-        name.setTypeface(null, selected ? Typeface.BOLD : Typeface.NORMAL);
-        choice.setContentDescription(name.getText()
-                + (selected ? ", selected" : ", not selected"));
+        TextView name = (TextView) choice.getTag();
+        choice.setBackground(Ui.rounded(selected ? Ui.ACCENT : Ui.RAISED, 12, this));
+        name.setTextColor(selected ? Ui.WHITE : Ui.MUTED);
+        choice.setContentDescription(name.getText() + (selected ? ", selected" : ", not selected"));
         choice.setSelected(selected);
     }
 
@@ -1783,11 +1788,11 @@ public final class MainActivity extends FragmentActivity {
 
     private void styleChip(TextView chip, boolean selected) {
         chip.setTag(selected);
-        chip.setTextColor(selected ? Ui.INK : Ui.MUTED);
+        chip.setTextColor(selected ? Ui.ACCENT : Ui.MUTED);
         chip.setBackground(Ui.roundedWithStroke(
-                selected ? Ui.ACCEPT_LIGHT : Ui.RAISED2,
+                selected ? Ui.PRIMARY : Ui.RAISED2,
                 12,
-                selected ? Ui.ACCEPT : Ui.LINE,
+                selected ? Ui.ACCENT : Ui.LINE,
                 1,
                 this));
     }
@@ -1821,15 +1826,17 @@ public final class MainActivity extends FragmentActivity {
         Button button = new Button(this);
         button.setText(AppLanguage.ui(this, label));
         button.setTextSize(14);
-        button.setTextColor(foreground);
+        button.setTextColor(background == Ui.ACCENT ? Ui.WHITE : foreground);
         button.setAllCaps(false);
-        button.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
+        button.setTypeface(Typeface.create("sans-serif-medium", Typeface.NORMAL));
+        button.setStateListAnimator(null);
+        button.setElevation(0);
         button.setGravity(Gravity.CENTER);
         button.setMinHeight(0);
         button.setMinimumHeight(0);
         button.setPadding(Ui.dp(this, 16), Ui.dp(this, 12),
                 Ui.dp(this, 16), Ui.dp(this, 12));
-        button.setBackground(Ui.rounded(background, 14, this));
+        button.setBackground(Ui.actionBackground(this, background, 18));
         return button;
     }
 
