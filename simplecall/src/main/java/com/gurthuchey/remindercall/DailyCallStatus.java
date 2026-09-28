@@ -138,18 +138,12 @@ final class DailyCallStatus {
         Entry meal = schedule.preMinutes > 0
                 ? readForDay(schedule.id, ReminderScheduler.PHASE_MEAL, displayDay) : null;
         Entry primary = readForDay(schedule.id, ReminderScheduler.PHASE_MEDICINE, displayDay);
-        Entry confirmation = schedule.confirmationMinutes > 0
-                ? readForDay(schedule.id, ReminderScheduler.PHASE_CONFIRMATION, displayDay) : null;
-
-        boolean calling = isCalling(meal, now) || isCalling(primary, now)
-                || isCalling(confirmation, now);
-        long retryAt = earliestRetry(meal, primary, confirmation);
-        boolean primaryDone = isCompleted(primary);
-        boolean confirmationDone = isCompleted(confirmation);
+        boolean calling = isCalling(meal, now) || isCalling(primary, now);
+        long retryAt = earliestRetry(meal, primary);
         boolean scheduledToday = isScheduledToday(schedule.days, referenceTime);
         long scheduledAt = scheduledAt(schedule.hour, schedule.minute, referenceTime);
         String kind = resolve(scheduledToday, scheduledAt, calling, retryAt > 0L,
-                primaryDone, schedule.confirmationMinutes > 0, confirmationDone, now);
+                isCompleted(primary), false, false, now);
         kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
         kind = applyManualIncomplete(kind, isIncomplete(primary));
         kind = applySkippedToday(kind, isSkipped(primary));
@@ -314,8 +308,7 @@ final class DailyCallStatus {
 
     private int displayDay(String scheduleId, long now) {
         int current = dayKey(now);
-        String[] phases = {ReminderScheduler.PHASE_MEAL, ReminderScheduler.PHASE_MEDICINE,
-                ReminderScheduler.PHASE_CONFIRMATION};
+        String[] phases = {ReminderScheduler.PHASE_MEAL, ReminderScheduler.PHASE_MEDICINE};
         int[] entryDays = {-1, -1, -1};
         long[] holdUntils = {0L, 0L, 0L};
         for (int index = 0; index < phases.length; index++) {
@@ -379,8 +372,7 @@ final class DailyCallStatus {
     private long referenceTime(String scheduleId, int statusDay, long now) {
         if (statusDay == dayKey(now)) return now;
         long latestUpdate = 0L;
-        String[] phases = {ReminderScheduler.PHASE_MEAL, ReminderScheduler.PHASE_MEDICINE,
-                ReminderScheduler.PHASE_CONFIRMATION};
+        String[] phases = {ReminderScheduler.PHASE_MEAL, ReminderScheduler.PHASE_MEDICINE};
         for (String phase : phases) {
             Entry entry = readRaw(scheduleId, phase);
             if (entry != null && entry.day == statusDay) {

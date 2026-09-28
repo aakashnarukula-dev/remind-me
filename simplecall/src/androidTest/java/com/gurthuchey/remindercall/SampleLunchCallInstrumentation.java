@@ -21,6 +21,10 @@ public final class SampleLunchCallInstrumentation extends Instrumentation {
     }
 
     @Override public void onStart() {
+        if (arguments != null && "true".equals(arguments.getString("regression"))) {
+            new ReminderModeRegression(this).run();
+            return;
+        }
         Context context = getTargetContext();
         boolean medicine = arguments != null
                 && "medicine".equals(arguments.getString("phase"));

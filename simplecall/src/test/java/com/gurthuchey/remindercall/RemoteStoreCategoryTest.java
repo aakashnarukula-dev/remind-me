@@ -68,13 +68,22 @@ public final class RemoteStoreCategoryTest {
         assertEquals("Okay", parsed.questions.get(0).answers.get(0).label);
     }
 
-    @Test public void confirmationSettingDefaultsOffAndParsesWhenEnabled() {
+    @Test public void legacyConfirmationSettingIsIgnored() {
         Map<String, Object> legacy = baseSchedule(null);
         assertEquals(0, RemoteStore.Schedule.fromRemote(legacy).confirmationMinutes);
 
         Map<String, Object> enabled = baseSchedule(null);
         enabled.put("confirmationMinutes", 10L);
-        assertEquals(10, RemoteStore.Schedule.fromRemote(enabled).confirmationMinutes);
+        assertEquals(0, RemoteStore.Schedule.fromRemote(enabled).confirmationMinutes);
+    }
+
+    @Test public void reminderModeSurvivesRemoteParsingAndLegacyDefaultsToCall() {
+        Map<String, Object> schedule = baseSchedule(null);
+        assertEquals("call", RemoteStore.Schedule.fromRemote(schedule).deliveryMode);
+        schedule.put("deliveryMode", "reminder");
+        assertTrue(RemoteStore.Schedule.fromRemote(schedule).textReminder());
+        schedule.put("deliveryMode", "unknown");
+        assertEquals("call", RemoteStore.Schedule.fromRemote(schedule).deliveryMode);
     }
 
     @Test public void malformedCustomConversationIsRejectedBeforeScheduling() {

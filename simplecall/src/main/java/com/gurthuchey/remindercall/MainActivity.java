@@ -687,8 +687,7 @@ public final class MainActivity extends FragmentActivity {
             String meta = categoryName(schedule.category) + " · " + daysText(schedule.days)
                     + ("medicine".equals(schedule.category) && schedule.preMinutes > 0
                     ? " · meal call " + schedule.preMinutes + " min before" : "")
-                    + (schedule.confirmationMinutes > 0
-                    ? " · confirm after " + schedule.confirmationMinutes + " min" : "");
+                    + " · " + (schedule.textReminder() ? "Reminder" : "Call");
             words.addView(Ui.text(this, meta, 11, Ui.MUTED, false));
             LinearLayout.LayoutParams wordsParams = new LinearLayout.LayoutParams(
                     0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
@@ -815,59 +814,10 @@ public final class MainActivity extends FragmentActivity {
         sheet.addView(reminder, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, 0, 2, 0, 12));
 
-        LinearLayout choices = new LinearLayout(this);
-        Button done = button(DailyCallStatus.completedLabel(currentLanguage()),
-                Color.rgb(226, 245, 233), Color.rgb(38, 117, 72));
-        done.setBackground(Ui.roundedWithStroke(Color.rgb(226, 245, 233), 14,
-                completed ? Color.rgb(38, 117, 72) : Ui.LINE, 1, this));
-        done.setOnClickListener(v -> {
-            ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEAL);
-            ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEDICINE);
-            ReminderScheduler.cancelRetry(this, schedule.id,
-                    ReminderScheduler.PHASE_CONFIRMATION);
-            dailyCallStatus.markCompleted(schedule.id, ReminderScheduler.PHASE_MEDICINE);
-            if (schedule.confirmationMinutes > 0) {
-                dailyCallStatus.markCompleted(schedule.id,
-                        ReminderScheduler.PHASE_CONFIRMATION);
-            }
+        sheet.addView(dailyStatusControls(schedule, () -> {
             dialog.dismiss();
             render();
-        });
-        choices.addView(done, new LinearLayout.LayoutParams(
-                0, Ui.dp(this, 52), 1f));
-
-        Button notDone = button(DailyCallStatus.incompleteLabel(currentLanguage()),
-                Color.rgb(255, 242, 211), Color.rgb(139, 98, 25));
-        notDone.setBackground(Ui.roundedWithStroke(Color.rgb(255, 242, 211), 14,
-                !completed && !skippedToday ? Color.rgb(139, 98, 25) : Ui.LINE, 1, this));
-        notDone.setOnClickListener(v -> {
-            dailyCallStatus.markIncomplete(schedule.id);
-            dialog.dismiss();
-            render();
-        });
-        LinearLayout.LayoutParams notDoneParams = new LinearLayout.LayoutParams(
-                0, Ui.dp(this, 52), 1f);
-        notDoneParams.setMarginStart(Ui.dp(this, 8));
-        choices.addView(notDone, notDoneParams);
-        sheet.addView(choices);
-
-        Button skipToday = button(AppLanguage.ui(currentLanguage(), "Skip for today"),
-                Color.rgb(253, 235, 237), Ui.DANGER);
-        skipToday.setBackground(Ui.roundedWithStroke(Color.rgb(253, 235, 237), 14,
-                skippedToday ? Ui.DANGER : Ui.LINE, 1, this));
-        skipToday.setOnClickListener(v -> {
-            dailyCallStatus.markSkippedToday(schedule.id);
-            ReminderScheduler.skipRemainingToday(this, schedule.id);
-            if (CallService.isProcessCallActive(schedule.id)) {
-                startService(new Intent(this, CallService.class)
-                        .setAction(CallService.ACTION_SKIP_TODAY)
-                        .putExtra(ReminderScheduler.EXTRA_ID, schedule.id));
-            }
-            dialog.dismiss();
-            render();
-        });
-        sheet.addView(skipToday, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
-                Ui.dp(this, 52), 0, 8, 0, 0));
+        }));
 
         TextView note = Ui.text(this, "Applies to today only", 12, Ui.MUTED, false);
         note.setGravity(Gravity.CENTER);
@@ -888,6 +838,68 @@ public final class MainActivity extends FragmentActivity {
         dialog.show();
         if (window != null) window.setLayout(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    private View dailyStatusControls(RemoteStore.Schedule schedule, Runnable changed) {
+        LinearLayout choices = new LinearLayout(this);
+        String[] labels = {DailyCallStatus.completedLabel(currentLanguage()),
+                DailyCallStatus.incompleteLabel(currentLanguage()),
+                DailyCallStatus.skippedLabel(currentLanguage())};
+        int[] colors = {Color.rgb(38, 117, 72), Color.rgb(139, 98, 25), Ui.DANGER};
+        int[] backgrounds = {Color.rgb(226, 245, 233), Color.rgb(255, 242, 211),
+                Color.rgb(253, 235, 237)};
+        TextView[] controls = new TextView[3];
+        Runnable update = () -> {
+            String kind = dailyCallStatus.display(schedule, System.currentTimeMillis()).kind;
+            int selected = DailyCallStatus.COMPLETED.equals(kind) ? 0
+                    : DailyCallStatus.SKIPPED.equals(kind) ? 2 : 1;
+            for (int i = 0; i < controls.length; i++) {
+                controls[i].setSelected(i == selected);
+                controls[i].setBackground(Ui.roundedWithStroke(backgrounds[i], 12,
+                        i == selected ? colors[i] : Ui.LINE, 1, this));
+            }
+        };
+        for (int index = 0; index < controls.length; index++) {
+            int choice = index;
+            TextView control = Ui.text(this, labels[index], 12, colors[index], true);
+            control.setGravity(Gravity.CENTER);
+            control.setPadding(Ui.dp(this, 5), Ui.dp(this, 6), Ui.dp(this, 5), Ui.dp(this, 6));
+            control.setMinHeight(Ui.dp(this, 48));
+            control.setContentDescription("Today's status: " + labels[index]);
+            control.setOnClickListener(v -> {
+                if (choice == 0) {
+                    ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEAL);
+                    ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEDICINE);
+                    ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_CONFIRMATION);
+                    dailyCallStatus.markCompleted(schedule.id, ReminderScheduler.PHASE_MEDICINE);
+                    if (CallService.isProcessCallActive(schedule.id)) {
+                        startService(new Intent(this, CallService.class)
+                                .setAction(CallService.ACTION_COMPLETE_TODAY)
+                                .putExtra(ReminderScheduler.EXTRA_ID, schedule.id));
+                    }
+                } else if (choice == 1) {
+                    dailyCallStatus.markIncomplete(schedule.id);
+                    ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
+                } else {
+                    dailyCallStatus.markSkippedToday(schedule.id);
+                    ReminderScheduler.skipRemainingToday(this, schedule.id);
+                    if (CallService.isProcessCallActive(schedule.id)) {
+                        startService(new Intent(this, CallService.class)
+                                .setAction(CallService.ACTION_SKIP_TODAY)
+                                .putExtra(ReminderScheduler.EXTRA_ID, schedule.id));
+                    }
+                }
+                update.run();
+                changed.run();
+            });
+            controls[index] = control;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+            if (index > 0) params.setMarginStart(Ui.dp(this, 6));
+            choices.addView(control, params);
+        }
+        update.run();
+        return choices;
     }
 
     private void showScheduleDialog(RemoteStore.Config config, RemoteStore.Schedule existing) {
@@ -959,6 +971,15 @@ public final class MainActivity extends FragmentActivity {
         form.setClipChildren(false);
         form.setClipToPadding(false);
 
+        if (existing != null) {
+            form.addView(fieldLabel("Today's status"), sizedMargins(
+                    ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    0, 0, 0, 4));
+            form.addView(dailyStatusControls(existing, this::render), sizedMargins(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT,
+                    0, 0, 0, 8));
+        }
+
         form.addView(fieldLabel("Category"));
         Runnable[] updateCategoryUi = new Runnable[1];
         int[] selectedCategory = {categoryIndex(draft.category)};
@@ -1016,12 +1037,12 @@ public final class MainActivity extends FragmentActivity {
         form.addView(medicine, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
                 Ui.dp(this, 48), 0, 4, 0, 0));
 
-        form.addView(fieldLabel("Call time"), sizedMargins(
+        form.addView(fieldLabel("Time & mode"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 0, 8, 0, 4));
         int[] selectedTime = {draft.hour, draft.minute};
         Button time = button(timeText(draft), Ui.RAISED2, Ui.INK);
-        time.setTextSize(20);
+        time.setTextSize(17);
         time.setBackground(Ui.roundedWithStroke(Ui.RAISED2, 14, Ui.LINE, 1, this));
         time.setElevation(0);
         time.setTranslationZ(0);
@@ -1034,8 +1055,29 @@ public final class MainActivity extends FragmentActivity {
             shown.minute = minute;
             time.setText(timeText(shown));
         }, selectedTime[0], selectedTime[1], false).show());
-        form.addView(time, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setGravity(Gravity.CENTER_VERTICAL);
+        modeRow.addView(time, new LinearLayout.LayoutParams(0, Ui.dp(this, 48), 1.3f));
+        TextView[] modeChips = new TextView[2];
+        String[] modes = {"call", "reminder"};
+        for (int index = 0; index < modes.length; index++) {
+            int choice = index;
+            TextView option = chip(index == 0 ? "Call" : "Reminder",
+                    modes[index].equals(draft.deliveryMode));
+            option.setContentDescription(index == 0 ? "Mode: Call" : "Mode: Reminder");
+            option.setOnClickListener(v -> {
+                draft.deliveryMode = modes[choice];
+                for (int i = 0; i < modeChips.length; i++) {
+                    styleChip(modeChips[i], i == choice);
+                }
+            });
+            modeChips[index] = option;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, Ui.dp(this, 48), 1f);
+            params.setMarginStart(Ui.dp(this, 6));
+            modeRow.addView(option, params);
+        }
+        form.addView(modeRow);
 
         form.addView(fieldLabel("Repeat on"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -1052,31 +1094,6 @@ public final class MainActivity extends FragmentActivity {
             dayRow.addView(chip, params);
         }
         form.addView(dayRow);
-
-        form.addView(fieldLabel("Confirmation call"), sizedMargins(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                0, 8, 0, 4));
-        int[] confirmationValues = {0, 10};
-        int[] selectedConfirmation = {draft.confirmationMinutes > 0 ? 10 : 0};
-        TextView[] confirmationChips = new TextView[confirmationValues.length];
-        LinearLayout confirmationRow = new LinearLayout(this);
-        for (int index = 0; index < confirmationValues.length; index++) {
-            int choice = index;
-            TextView chip = chip(confirmationValues[index] == 0 ? "OFF" : "10 min",
-                    selectedConfirmation[0] == confirmationValues[index]);
-            chip.setOnClickListener(v -> {
-                selectedConfirmation[0] = confirmationValues[choice];
-                for (int i = 0; i < confirmationChips.length; i++) {
-                    styleChip(confirmationChips[i], i == choice);
-                }
-            });
-            confirmationChips[index] = chip;
-            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                    0, Ui.dp(this, 34), 1f);
-            if (index == 0) params.setMarginEnd(Ui.dp(this, 6));
-            confirmationRow.addView(chip, params);
-        }
-        form.addView(confirmationRow);
 
         LinearLayout medicineOptions = new LinearLayout(this);
         medicineOptions.setOrientation(LinearLayout.VERTICAL);
@@ -1106,7 +1123,7 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout conversation = new LinearLayout(this);
         conversation.setOrientation(LinearLayout.VERTICAL);
-        conversation.addView(fieldLabel("Call conversation"), sizedMargins(
+        conversation.addView(fieldLabel("Questions & answers"), sizedMargins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 0, 8, 0, 4));
         Button conversationButton = button("", Ui.ACCEPT_LIGHT, Ui.INK);
@@ -1171,7 +1188,7 @@ public final class MainActivity extends FragmentActivity {
             draft.minute = selectedTime[1];
             draft.days = dayMask;
             draft.preMinutes = medicineReminder ? selectedLead[0] : 0;
-            draft.confirmationMinutes = selectedConfirmation[0];
+            draft.confirmationMinutes = 0;
             draft.enabled = true;
             if (existing == null) config.schedules.add(draft);
             else {
@@ -1237,7 +1254,8 @@ public final class MainActivity extends FragmentActivity {
         copy.minute = source.minute;
         copy.days = source.days;
         copy.preMinutes = source.preMinutes;
-        copy.confirmationMinutes = source.confirmationMinutes;
+        copy.confirmationMinutes = 0;
+        copy.deliveryMode = source.deliveryMode;
         copy.enabled = source.enabled;
         for (RemoteStore.ScriptQuestion sourceQuestion : source.questions) {
             RemoteStore.ScriptQuestion question = new RemoteStore.ScriptQuestion();
@@ -1466,7 +1484,7 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(Ui.text(this, "Call conversation", 24, Ui.INK, true),
+        header.addView(Ui.text(this, "Questions & answers", 24, Ui.INK, true),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView close = Ui.text(this, "×", 26, Ui.MUTED, false);
         close.setGravity(Gravity.CENTER);

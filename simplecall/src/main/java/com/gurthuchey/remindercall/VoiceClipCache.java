@@ -183,7 +183,7 @@ final class VoiceClipCache {
         Map<String, ClipEntry> values = new LinkedHashMap<>();
         if (config == null) return values;
         for (RemoteStore.Schedule schedule : config.schedules) {
-            if (!schedule.enabled) continue;
+            if (!schedule.enabled || schedule.textReminder()) continue;
             String language = AppLanguage.normalize(schedule.language);
             if (schedule.scripted()) {
                 for (RemoteStore.ScriptQuestion question : schedule.questions) {
@@ -217,16 +217,7 @@ final class VoiceClipCache {
             for (int minutes : CallService.DELAY_MINUTES) {
                 add(values, SpeechText.reminderDelayed(minutes, language), language);
             }
-            if (schedule.confirmationMinutes > 0) {
-                add(values, SpeechText.confirmationQuestion(config.memberName, schedule.label,
-                        schedule.category, language), language);
-                add(values, SpeechText.medicineTaken(config.memberName, language), language);
-                add(values, SpeechText.confirmationNotTaken(language), language);
-                add(values, SpeechText.reminderDelayQuestion(language), language);
-                for (int minutes : CallService.DELAY_MINUTES) {
-                    add(values, SpeechText.reminderDelayed(minutes, language), language);
-                }
-            }
+
         }
         return values;
     }

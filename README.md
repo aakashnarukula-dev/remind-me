@@ -17,6 +17,11 @@ Each member has one Admin-assigned Indian mobile number. When that number signs 
 
 ## Reminder behavior
 
+- Each reminder has a **Call / Reminder** mode in both editors. Existing reminders default to Call.
+- Reminder mode rings and opens the text question with answer buttons immediately, without an answer gesture, spoken audio, speaker control, or call-style notification. The first answer silences the ring. Information-only messages and text responses stay visible with an **Okay** button; unanswered questions retry after one minute of inactivity plus the normal five-minute retry delay.
+- The member reminder editor includes compact **Today's status** controls for Completed, Not completed, and Skipped. Changes apply immediately, independently of saving reminder settings.
+- Confirmation calls are retired. Old saved confirmation settings and retries are ignored.
+
 - The medicine name is entered without the word `tablet`; Chitti adds `టాబ్లెట్` to the Telugu prompt.
 - Reminder categories are Medicine, Appointment, Bill or payment, Exercise, Meal, Task, Wake-up, and Custom.
 - Medicine keeps its tested dose flow. Every other category uses the ordered questions, answer buttons, and spoken responses written in Admin.
@@ -67,6 +72,16 @@ Use JDK 17 and Android SDK 35:
 ```bash
 ./gradlew test lintRelease assembleRelease
 npm run check --prefix functions
+```
+
+The offline reminder-mode regression suite uses a disposable Android emulator (never a personal phone):
+
+```bash
+./gradlew -PtestBuildType=debug :simplecall:assembleDebug :simplecall:assembleDebugAndroidTest
+adb -s emulator-5554 install -r simplecall/build/outputs/apk/debug/Gurthu-Chey-2.0-debug.apk
+adb -s emulator-5554 install -r simplecall/build/outputs/apk/androidTest/debug/Gurthu-Chey-2.0-debug-androidTest.apk
+adb -s emulator-5554 shell pm grant com.gurthuchey.app android.permission.POST_NOTIFICATIONS
+adb -s emulator-5554 shell am instrument -w -e regression true com.gurthuchey.app.test/com.gurthuchey.remindercall.SampleLunchCallInstrumentation
 ```
 
 Release APKs are R8-minified, resource-shrunk, and signed with this workstation's existing Android signing certificate so future direct-install updates remain compatible.
