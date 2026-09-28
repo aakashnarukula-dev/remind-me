@@ -165,6 +165,37 @@ final class Ui {
 
     static Drawable reminderMark() { return new ReminderMark(); }
 
+    static Drawable plusIcon(Context context) { return new PlusIcon(context); }
+
+    private static final class PlusIcon extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float arm;
+        private final float stroke;
+
+        PlusIcon(Context context) {
+            float density = context.getResources().getDisplayMetrics().density;
+            arm = 8 * density;
+            stroke = 2.25f * density;
+            paint.setColor(WHITE);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.SQUARE);
+            paint.setStrokeWidth(stroke);
+        }
+
+        @Override public void draw(Canvas canvas) {
+            float cx = getBounds().exactCenterX();
+            float cy = getBounds().exactCenterY();
+            canvas.drawLine(cx - arm, cy, cx + arm, cy, paint);
+            canvas.drawLine(cx, cy - arm, cx, cy + arm, paint);
+        }
+
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) {
+            paint.setColorFilter(filter);
+        }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
     private static final class ReminderMark extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         @Override public void draw(Canvas canvas) {

@@ -255,9 +255,10 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
         brandParams.setMarginStart(Ui.dp(this, 10));
         header.addView(brand, brandParams);
-        TextView add = Ui.text(this, "+", 25, Ui.WHITE, false);
+        TextView add = new TextView(this);
         add.setGravity(Gravity.CENTER);
         add.setBackground(Ui.actionBackground(this, Ui.ACCENT, 16));
+        add.setForeground(Ui.plusIcon(this));
         add.setContentDescription(AppLanguage.ui(this, "Add reminder"));
         add.setOnClickListener(v -> showScheduleDialog(config, null));
         header.addView(add, Ui.margins(Ui.dp(this, 44), Ui.dp(this, 44), this, 0, 0, 8, 0));
