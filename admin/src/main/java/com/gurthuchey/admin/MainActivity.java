@@ -863,8 +863,7 @@ public final class MainActivity extends FragmentActivity {
         String meta = categoryName(schedule.category) + " · " + localizedDaysText(schedule.days)
                 + ("medicine".equals(schedule.category) && schedule.preMinutes > 0
                 ? " · meal call " + schedule.preMinutes + " min before" : "")
-                + (schedule.confirmationMinutes > 0
-                ? " · confirm after " + schedule.confirmationMinutes + " min" : "")
+                + " · " + (schedule.textReminder() ? "Reminder" : "Call")
                 + (!schedule.enabled ? " · Paused" : "");
         words.addView(Ui.text(this, meta, 11,
                 schedule.enabled ? Ui.MUTED : Ui.CORAL, !schedule.enabled));
@@ -1273,12 +1272,12 @@ public final class MainActivity extends FragmentActivity {
         form.addView(medicine, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT,
                 Ui.dp(this, 48), this, 0, 4, 0, 0));
 
-        form.addView(label("Call time"), Ui.margins(ViewGroup.LayoutParams.WRAP_CONTENT,
+        form.addView(label("Time & mode"), Ui.margins(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 8, 0, 4));
         final int[] selectedTime = {draft.hour, draft.minute};
         Button timeButton = Ui.button(this, timeText(selectedTime[0], selectedTime[1]),
                 Ui.RAISED2, Ui.INK);
-        timeButton.setTextSize(21);
+        timeButton.setTextSize(17);
         timeButton.setBackground(Ui.strokedShape(Ui.RAISED2, 14, Ui.LINE, 1, this));
         timeButton.setElevation(0);
         timeButton.setTranslationZ(0);
@@ -1288,7 +1287,29 @@ public final class MainActivity extends FragmentActivity {
             selectedTime[1] = minute;
             timeButton.setText(timeText(hour, minute));
         }, selectedTime[0], selectedTime[1], false).show());
-        form.addView(timeButton, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 48)));
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setGravity(Gravity.CENTER_VERTICAL);
+        modeRow.addView(timeButton, new LinearLayout.LayoutParams(0, Ui.dp(this, 48), 1.3f));
+        TextView[] modeChips = new TextView[2];
+        String[] modes = {"call", "reminder"};
+        for (int index = 0; index < modes.length; index++) {
+            int choice = index;
+            TextView option = dayChip(index == 0 ? "Call" : "Reminder",
+                    modes[index].equals(draft.deliveryMode));
+            option.setContentDescription(index == 0 ? "Mode: Call" : "Mode: Reminder");
+            option.setOnClickListener(v -> {
+                draft.deliveryMode = modes[choice];
+                for (int i = 0; i < modeChips.length; i++) {
+                    styleDayChip(modeChips[i], i == choice);
+                }
+            });
+            modeChips[index] = option;
+            LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                    0, Ui.dp(this, 48), 1f);
+            params.setMarginStart(Ui.dp(this, 6));
+            modeRow.addView(option, params);
+        }
+        form.addView(modeRow);
 
         form.addView(label("Repeat on"), Ui.margins(ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 8, 0, 4));
@@ -1307,32 +1328,6 @@ public final class MainActivity extends FragmentActivity {
             dayRow.addView(chip, chipParams);
         }
         form.addView(dayRow);
-
-        form.addView(label("Confirmation call"), Ui.margins(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
-                this, 0, 8, 0, 4));
-        int[] confirmationValues = {0, 10};
-        int[] selectedConfirmation = {draft.confirmationMinutes > 0 ? 10 : 0};
-        TextView[] confirmationChips = new TextView[confirmationValues.length];
-        LinearLayout confirmationRow = new LinearLayout(this);
-        confirmationRow.setOrientation(LinearLayout.HORIZONTAL);
-        for (int index = 0; index < confirmationValues.length; index++) {
-            final int choice = index;
-            TextView chip = dayChip(confirmationValues[index] == 0 ? "OFF" : "10 min",
-                    selectedConfirmation[0] == confirmationValues[index]);
-            chip.setOnClickListener(v -> {
-                selectedConfirmation[0] = confirmationValues[choice];
-                for (int i = 0; i < confirmationChips.length; i++) {
-                    styleDayChip(confirmationChips[i], i == choice);
-                }
-            });
-            confirmationChips[index] = chip;
-            LinearLayout.LayoutParams chipParams = new LinearLayout.LayoutParams(
-                    0, Ui.dp(this, 34), 1f);
-            if (index == 0) chipParams.setMarginEnd(Ui.dp(this, 7));
-            confirmationRow.addView(chip, chipParams);
-        }
-        form.addView(confirmationRow);
 
         LinearLayout medicineOptions = new LinearLayout(this);
         medicineOptions.setOrientation(LinearLayout.VERTICAL);
@@ -1367,7 +1362,7 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout conversation = new LinearLayout(this);
         conversation.setOrientation(LinearLayout.VERTICAL);
-        conversation.addView(label("Call conversation"), Ui.margins(
+        conversation.addView(label("Questions & answers"), Ui.margins(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT,
                 this, 0, 8, 0, 4));
         Button conversationButton = Ui.button(this, "", Ui.MINT, Ui.INK);
@@ -1426,7 +1421,7 @@ public final class MainActivity extends FragmentActivity {
             draft.minute = selectedTime[1];
             draft.days = dayMask;
             draft.preMinutes = isMedicine ? selectedLead[0] : 0;
-            draft.confirmationMinutes = selectedConfirmation[0];
+            draft.confirmationMinutes = 0;
             if ((existing == null || !isMedicine || !draft.questions.isEmpty())
                     && !validConversation(draft)) {
                 Toast.makeText(this, "Add at least one question",
@@ -1694,7 +1689,7 @@ public final class MainActivity extends FragmentActivity {
 
         LinearLayout header = new LinearLayout(this);
         header.setGravity(Gravity.CENTER_VERTICAL);
-        header.addView(Ui.text(this, "Call conversation", 24, Ui.INK, true),
+        header.addView(Ui.text(this, "Questions & answers", 24, Ui.INK, true),
                 new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         TextView close = Ui.text(this, "×", 26, Ui.MUTED, false);
         close.setGravity(Gravity.CENTER);

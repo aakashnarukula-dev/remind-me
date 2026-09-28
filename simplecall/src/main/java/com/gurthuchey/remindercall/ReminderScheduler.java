@@ -39,6 +39,7 @@ final class ReminderScheduler {
         long now = System.currentTimeMillis();
         DailyCallStatus statuses = new DailyCallStatus(context);
         for (RemoteStore.Schedule schedule : config.schedules) {
+            cancelRetry(context, schedule.id, PHASE_CONFIRMATION);
             if (!schedule.enabled) continue;
             long scheduleAfter = schedulingFloor(after, now,
                     statuses.isSkippedToday(schedule.id, now));
@@ -76,7 +77,6 @@ final class ReminderScheduler {
                 || previous.minute != replacement.minute
                 || previous.days != replacement.days
                 || previous.preMinutes != replacement.preMinutes
-                || previous.confirmationMinutes != replacement.confirmationMinutes
                 || previous.enabled != replacement.enabled
                 || previous.custom() != replacement.custom();
     }
@@ -138,13 +138,10 @@ final class ReminderScheduler {
     }
 
     static RemoteStore.Schedule active(RemoteStore.Config config, String id, String phase) {
-        if (config == null || id == null) return null;
+        if (config == null || id == null || PHASE_CONFIRMATION.equals(phase)) return null;
         for (RemoteStore.Schedule schedule : config.schedules) {
             if (!id.equals(schedule.id) || !schedule.enabled) continue;
             if (PHASE_MEAL.equals(phase) && (schedule.custom() || schedule.preMinutes <= 0)) {
-                return null;
-            }
-            if (PHASE_CONFIRMATION.equals(phase) && schedule.confirmationMinutes <= 0) {
                 return null;
             }
             return schedule;
@@ -249,14 +246,6 @@ final class ReminderScheduler {
     static long schedulingFloor(long requestedAfter, long now, boolean skippedToday) {
         if (!skippedToday) return requestedAfter;
         return Math.max(requestedAfter, DailyCallStatus.nextLocalDayStart(now));
-    }
-
-    static void scheduleConfirmation(Context context, String id) {
-        RemoteStore.Config config = new RemoteStore(context).load();
-        RemoteStore.Schedule schedule = active(config, id, PHASE_CONFIRMATION);
-        if (schedule == null) return;
-        scheduleRetryAfter(context, schedule.id, PHASE_CONFIRMATION, schedule.label,
-                config.memberName, schedule.preMinutes, schedule.confirmationMinutes);
     }
 
     private static void scheduleRetryAt(Context context, String id, String phase, String label,

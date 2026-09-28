@@ -41,6 +41,8 @@ public final class CallService extends Service {
     static final String ACTION_DELAY = "com.gurthuchey.remindercall.DELAY";
     static final String ACTION_DELAY_AT = "com.gurthuchey.remindercall.DELAY_AT";
     static final String ACTION_SKIP_TODAY = "com.gurthuchey.remindercall.SKIP_TODAY";
+    static final String ACTION_CONTINUE = "com.gurthuchey.remindercall.CONTINUE";
+    static final String ACTION_COMPLETE_TODAY = "com.gurthuchey.remindercall.COMPLETE_TODAY";
     static final String ACTION_END = "com.gurthuchey.remindercall.END";
     static final String ACTION_SILENCE = "com.gurthuchey.remindercall.SILENCE";
     static final String ACTION_RESTORE_NOTIFICATION =
@@ -89,6 +91,8 @@ public final class CallService extends Service {
     private long speechGeneration;
     private boolean active;
     private boolean answered;
+    private boolean textReminder;
+    private int pendingTextStep = -2;
     private boolean finalizing;
     private boolean transitioning;
     private boolean selectingDelay;
@@ -171,6 +175,13 @@ public final class CallService extends Service {
             enterRingForeground(intent);
             startRinging(intent);
         }
+        else if (ACTION_CONTINUE.equals(action)) continueText(
+                intent.getIntExtra(EXTRA_OPTION_STEP, -1));
+        else if (ACTION_COMPLETE_TODAY.equals(action)) {
+            if (active && scheduleId.equals(intent.getStringExtra(ReminderScheduler.EXTRA_ID))) {
+                finishCall();
+            }
+        }
         else if (ACTION_ANSWER.equals(action)) answer();
         else if (ACTION_REJECT.equals(action)) reject(false);
         else if (ACTION_OPTION.equals(action)) choose(intent.getIntExtra(EXTRA_OPTION, -1),
@@ -219,6 +230,12 @@ public final class CallService extends Service {
         doseHour = intent.getIntExtra("doseHour", -1);
         RemoteStore.Config config = new RemoteStore(this).load();
         activeSchedule = ReminderScheduler.active(config, scheduleId, phase);
+        if (ReminderScheduler.PHASE_CONFIRMATION.equals(phase)) {
+            stopWithoutCall();
+            return;
+        }
+        textReminder = activeSchedule != null && activeSchedule.textReminder();
+        pendingTextStep = -2;
         if (!"test-call".equals(scheduleId)
                 && new DailyCallStatus(this).isSkippedToday(scheduleId,
                         System.currentTimeMillis())) {
@@ -244,7 +261,7 @@ public final class CallService extends Service {
         active = true;
         processCallActive = true;
         processScheduleId = scheduleId;
-        answered = false;
+        answered = textReminder;
         speakerOn = false;
         finalizing = false;
         transitioning = false;
@@ -258,7 +275,13 @@ public final class CallService extends Service {
         Log.i(TAG, "Ringing " + scheduleId + " / " + phase);
         startRingAudio();
         handler.removeCallbacks(missedCall);
-        handler.postDelayed(missedCall, RING_TIMEOUT_MS);
+        if (textReminder) {
+            ReminderScheduler.cancelRetry(this, scheduleId, phase);
+            announceQuestion(0);
+            startForeground(NOTIFICATION_ID, reminderNotification(question(), true));
+        } else {
+            handler.postDelayed(missedCall, RING_TIMEOUT_MS);
+        }
         broadcastState();
         launchCallScreen();
     }
@@ -287,10 +310,22 @@ public final class CallService extends Service {
             return;
         }
         step = nextStep;
+        pendingTextStep = -2;
         transitioning = false;
         writeSession();
         showOngoingNotification(question());
         broadcastState();
+        if (textReminder) {
+            if (ReminderScheduler.PHASE_MEAL.equals(phase)) pendingTextStep = -1;
+            else if (informationOnlyQuestion(activeSchedule, step)) {
+                pendingTextStep = step + 1 < activeSchedule.questions.size() ? step + 1 : -1;
+            }
+            writeSession();
+            broadcastState();
+            handler.removeCallbacks(unansweredQuestion);
+            handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS);
+            return;
+        }
         if (ReminderScheduler.PHASE_MEAL.equals(phase) && step == 0) {
             finalizing = true;
             handler.removeCallbacks(unansweredQuestion);
@@ -320,9 +355,10 @@ public final class CallService extends Service {
     private void choose(int option, int expectedStep) {
         int maximumOption = selectingDelay ? DELAY_MINUTES.length - 1
                 : customCall() ? customAnswerCount()
-                : step == 2 ? DELAY_MINUTES.length - 1 : confirmationCall() ? 2 : 1;
-        if (!active || !answered || expectedStep != step
+                : step == 2 ? DELAY_MINUTES.length - 1 : 1;
+        if (!active || !answered || finalizing || expectedStep != step
                 || transitioning || option < 0 || option > maximumOption) return;
+        stopRingAudio();
         handler.removeCallbacks(unansweredQuestion);
         if (selectingDelay) {
             int delay = DELAY_MINUTES[option];
@@ -331,28 +367,6 @@ public final class CallService extends Service {
                         label, member, preMinutes, delay);
             }
             finishWithResponse(SpeechText.reminderDelayed(delay, language));
-            return;
-        }
-        if (confirmationCall()) {
-            if (step == 0 && option == 0) {
-                markCurrentCompleted();
-                finishWithResponse(SpeechText.medicineTaken(member, language));
-            } else if (step == 0 && option == 1) {
-                if (!"test-call".equals(scheduleId)) {
-                    ReminderScheduler.scheduleRetryAfter(this, scheduleId, phase,
-                            label, member, preMinutes, 5);
-                }
-                finishWithResponse(SpeechText.confirmationNotTaken(language));
-            } else if (step == 0) {
-                announceQuestion(2);
-            } else {
-                int delay = DELAY_MINUTES[option];
-                if (!"test-call".equals(scheduleId)) {
-                    ReminderScheduler.scheduleRetryAfter(this, scheduleId, phase,
-                            label, member, preMinutes, delay);
-                }
-                finishWithResponse(SpeechText.reminderDelayed(delay, language));
-            }
             return;
         }
         if (customCall()) {
@@ -366,7 +380,6 @@ public final class CallService extends Service {
             int nextStep = step + 1;
             if (nextStep >= activeSchedule.questions.size()) {
                 markCurrentCompleted();
-                scheduleConfirmationAfterPrimary();
                 if (response.isEmpty()) finishCall(); else finishWithResponse(response);
             } else if (response.isEmpty()) {
                 announceQuestion(nextStep);
@@ -379,7 +392,6 @@ public final class CallService extends Service {
             if (option == 0) {
                 if (!ReminderScheduler.PHASE_MEAL.equals(phase)) {
                     markCurrentCompleted();
-                    scheduleConfirmationAfterPrimary();
                 }
                 finishWithResponse(ReminderScheduler.PHASE_MEAL.equals(phase)
                         ? SpeechText.mealAcknowledged(language)
@@ -393,7 +405,6 @@ public final class CallService extends Service {
         if (step == 1) {
             if (option == 0) {
                 markCurrentCompleted();
-                scheduleConfirmationAfterPrimary();
                 finishWithResponse(SpeechText.medicineTaken(member, language));
             }
             else announceQuestion(2);
@@ -412,6 +423,7 @@ public final class CallService extends Service {
     private void chooseDelay(int option, int expectedStep) {
         if (!active || !answered || finalizing || transitioning || !customCall()
                 || expectedStep != step || option < 0 || option >= DELAY_MINUTES.length) return;
+        stopRingAudio();
         handler.removeCallbacks(unansweredQuestion);
         int delay = DELAY_MINUTES[option];
         if (!"test-call".equals(scheduleId)) {
@@ -426,6 +438,7 @@ public final class CallService extends Service {
         if (!active || !answered || finalizing || transitioning || !delayAvailable
                 || expectedStep != step || !ReminderScheduler.isAllowedDelayTime(
                         System.currentTimeMillis(), at)) return;
+        stopRingAudio();
         handler.removeCallbacks(unansweredQuestion);
         if (!"test-call".equals(scheduleId)
                 && !ReminderScheduler.scheduleRetryAtTime(this, scheduleId, phase,
@@ -438,19 +451,22 @@ public final class CallService extends Service {
 
     private void announceDelayQuestion() {
         if (!active || !answered || finalizing) return;
+        stopRingAudio();
+        pendingTextStep = -2;
         selectingDelay = true;
         transitioning = false;
         handler.removeCallbacks(unansweredQuestion);
         writeSession();
         showOngoingNotification(question());
         broadcastState();
-        handler.postDelayed(unansweredQuestion, ANSWER_TIMEOUT_MS + 30_000L);
+        handler.postDelayed(unansweredQuestion,
+                textReminder ? ANSWER_TIMEOUT_MS : ANSWER_TIMEOUT_MS + 30_000L);
         speak(question(), "delay_question");
     }
 
     private void reject(boolean missed) {
         if (!active) return;
-        if (!"test-call".equals(scheduleId)) {
+        if (!finalizing && !"test-call".equals(scheduleId)) {
             ReminderScheduler.scheduleRetry(this, scheduleId, phase,
                     label, member, preMinutes);
         }
@@ -472,7 +488,7 @@ public final class CallService extends Service {
     }
 
     private void toggleSpeaker() {
-        if (!active || !answered) return;
+        if (!active || !answered || textReminder) return;
         speakerOn = !speakerOn;
         configureVoiceRoute();
         getSharedPreferences(SESSION, MODE_PRIVATE).edit()
@@ -504,6 +520,7 @@ public final class CallService extends Service {
     }
 
     private void speak(String text, String id) {
+        if (textReminder) return;
         cancelSpeechPlayback();
         long generation = speechGeneration;
         File clip = VoiceClipCache.fileFor(this, text, language);
@@ -596,13 +613,16 @@ public final class CallService extends Service {
     }
 
     private void finishWithResponse(String response) {
+        stopRingAudio();
         finalizing = true;
+        pendingTextStep = textReminder ? -1 : -2;
         getSharedPreferences(SESSION, MODE_PRIVATE).edit()
                 .putString("question", response).putString("answerA", "")
                 .putString("answerB", "").putString("answerC", "")
                 .putString("answerD", "").putBoolean("showDelayOptions", false)
                 .putBoolean("showRemindLater", false)
-                .putBoolean("finalizing", true).putBoolean("transitioning", false).apply();
+                .putBoolean("finalizing", true).putBoolean("transitioning", false)
+                .putBoolean("showTextContinue", textReminder).apply();
         showOngoingNotification(response);
         broadcastState();
         speak(response, "finish");
@@ -610,13 +630,16 @@ public final class CallService extends Service {
     }
 
     private void continueWithResponse(String response, int nextStep) {
+        stopRingAudio();
         transitioning = true;
+        pendingTextStep = textReminder ? nextStep : -2;
         getSharedPreferences(SESSION, MODE_PRIVATE).edit()
                 .putString("question", response).putString("answerA", "")
                 .putString("answerB", "").putString("answerC", "")
                 .putString("answerD", "").putBoolean("showDelayOptions", false)
                 .putBoolean("showRemindLater", false)
-                .putBoolean("transitioning", true).apply();
+                .putBoolean("transitioning", true)
+                .putBoolean("showTextContinue", textReminder).apply();
         showOngoingNotification(response);
         broadcastState();
         speak(response, "continue_" + nextStep);
@@ -630,7 +653,6 @@ public final class CallService extends Service {
                 && active && answered && !finalizing) {
             handler.removeCallbacks(unansweredQuestion);
             markCurrentCompleted();
-            scheduleConfirmationAfterPrimary();
             finishCall();
         } else if (id != null && id.startsWith("info_continue_")
                 && active && answered && !finalizing) {
@@ -691,10 +713,11 @@ public final class CallService extends Service {
     }
 
     private void silenceRinging() {
-        if (active && !answered) stopRingAudio();
+        if (active && (!answered || textReminder)) stopRingAudio();
     }
 
     private Notification incomingNotification() {
+        if (textReminder) return reminderNotification(reminderTitle(), true);
         String incoming = reminderTitle();
         Notification.Builder builder = baseBuilder(callerName(), incoming)
                 .setContentIntent(activityPending())
@@ -718,6 +741,7 @@ public final class CallService extends Service {
     }
 
     private Notification ongoingNotification(String question) {
+        if (textReminder) return reminderNotification(question, false);
         long startedAt = connectedAtMillis > 0L
                 ? connectedAtMillis
                 : getSharedPreferences(SESSION, MODE_PRIVATE)
@@ -740,6 +764,34 @@ public final class CallService extends Service {
                             actionPending(ACTION_END, 33, -1)).build());
         }
         return nonClearable(builder.build());
+    }
+
+    private Notification reminderNotification(String text, boolean fullScreen) {
+        Notification.Builder builder = baseBuilder(reminderTitle(), text)
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setContentIntent(activityPending())
+                .setStyle(new Notification.BigTextStyle().bigText(text))
+                .setDeleteIntent(actionPending(ACTION_RESTORE_NOTIFICATION, 32, -1))
+                .setOngoing(true);
+        if (fullScreen) builder.setFullScreenIntent(activityPending(), true);
+        if (!finalizing) builder.addAction(new Notification.Action.Builder(null,
+                AppLanguage.ui(language, "Remind me later"),
+                actionPending(ACTION_REJECT, 31, -1)).build());
+        return nonClearable(builder.build());
+    }
+
+    private void continueText(int expectedStep) {
+        if (!active || !textReminder || expectedStep != step || pendingTextStep == -2) return;
+        stopRingAudio();
+        handler.removeCallbacks(unansweredQuestion);
+        int nextStep = pendingTextStep;
+        pendingTextStep = -2;
+        if (nextStep < 0) {
+            if (!finalizing) markCurrentCompleted();
+            finishCall();
+        } else {
+            announceQuestion(nextStep);
+        }
     }
 
     @android.annotation.TargetApi(Build.VERSION_CODES.P)
@@ -841,6 +893,7 @@ public final class CallService extends Service {
             member = safe(intent.getStringExtra("member"), "Family member");
             RemoteStore.Config config = new RemoteStore(this).load();
             RemoteStore.Schedule schedule = ReminderScheduler.active(config, scheduleId, phase);
+            textReminder = schedule != null && schedule.textReminder();
             language = schedule == null
                     ? (config == null ? AppLanguage.current(this)
                             : AppLanguage.normalize(config.language))
@@ -975,6 +1028,8 @@ public final class CallService extends Service {
         getSharedPreferences(SESSION, MODE_PRIVATE).edit()
                 .putBoolean("active", active)
                 .putBoolean("answered", answered)
+                .putBoolean("textReminder", textReminder)
+                .putBoolean("showTextContinue", textReminder && pendingTextStep != -2)
                 .putBoolean("finalizing", finalizing)
                 .putLong("connectedAtMillis", connectedAtMillis)
                 .putInt("step", step)
@@ -1004,11 +1059,6 @@ public final class CallService extends Service {
 
     private String question() {
         if (selectingDelay) return SpeechText.reminderDelayQuestion(language);
-        if (confirmationCall()) {
-            if (step == 2) return SpeechText.reminderDelayQuestion(language);
-            return SpeechText.confirmationQuestion(member, label,
-                    activeSchedule == null ? "custom" : activeSchedule.category, language);
-        }
         if (customCall()) {
             return SpeechText.custom(activeSchedule.questions.get(step).prompt,
                     member, label, activeSchedule.category, language);
@@ -1025,7 +1075,6 @@ public final class CallService extends Service {
     private String answerA() {
         if (customCall()) return answerAt(0);
         if (step == 2) return "";
-        if (confirmationCall()) return SpeechText.confirmationDone(language);
         if (step == 0) return ReminderScheduler.PHASE_MEAL.equals(phase)
                 ? "" : SpeechText.answerTaken(language);
         return ReminderScheduler.PHASE_MEAL.equals(phase)
@@ -1034,7 +1083,6 @@ public final class CallService extends Service {
 
     private String answerB() {
         if (customCall()) return answerAt(1);
-        if (confirmationCall() && step == 0) return SpeechText.confirmationNotDone(language);
         if (step == 0) return ReminderScheduler.PHASE_MEAL.equals(phase)
                 ? "" : SpeechText.answerNotTaken(language);
         if (step == 1 && !ReminderScheduler.PHASE_MEAL.equals(phase)) {
@@ -1045,7 +1093,6 @@ public final class CallService extends Service {
 
     private String answerC() {
         if (customCall()) return answerAt(2);
-        if (confirmationCall() && step == 0) return SpeechText.answerLater(language);
         return "";
     }
 
@@ -1073,18 +1120,6 @@ public final class CallService extends Service {
     private boolean customCall() {
         return activeSchedule != null && activeSchedule.scripted()
                 && ReminderScheduler.PHASE_MEDICINE.equals(phase);
-    }
-
-    private boolean confirmationCall() {
-        return ReminderScheduler.PHASE_CONFIRMATION.equals(phase);
-    }
-
-    private void scheduleConfirmationAfterPrimary() {
-        if (!"test-call".equals(scheduleId)
-                && ReminderScheduler.PHASE_MEDICINE.equals(phase)
-                && activeSchedule != null && activeSchedule.confirmationMinutes > 0) {
-            ReminderScheduler.scheduleConfirmation(this, scheduleId);
-        }
     }
 
     private void markCurrentCalling() {

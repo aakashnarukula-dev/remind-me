@@ -146,6 +146,13 @@ public final class ReminderSchedulerTest {
         assertFalse(ReminderScheduler.occurrenceChanged(before, after));
     }
 
+    @Test public void changingDeliveryModePreservesDailyProgress() {
+        RemoteStore.Schedule before = scheduleAt(17, 15);
+        RemoteStore.Schedule after = scheduleAt(17, 15);
+        after.deliveryMode = "reminder";
+        assertFalse(ReminderScheduler.occurrenceChanged(before, after));
+    }
+
     @Test public void removingReminderInvalidatesOldOccurrenceProgress() {
         assertTrue(ReminderScheduler.occurrenceChanged(scheduleAt(17, 15), null));
         assertFalse(ReminderScheduler.occurrenceChanged(null, scheduleAt(17, 15)));
@@ -159,7 +166,7 @@ public final class ReminderSchedulerTest {
         assertFalse(AlarmReceiver.shouldDeliver(true, true, false));
     }
 
-    @Test public void confirmationPhaseExistsOnlyWhenEnabledForThatReminder() {
+    @Test public void legacyConfirmationPhaseIsNeverScheduled() {
         RemoteStore.Schedule schedule = new RemoteStore.Schedule();
         schedule.id = "cholesterol";
         schedule.enabled = true;
@@ -169,7 +176,7 @@ public final class ReminderSchedulerTest {
         assertNull(ReminderScheduler.active(config, "cholesterol",
                 ReminderScheduler.PHASE_CONFIRMATION));
         schedule.confirmationMinutes = 10;
-        assertNotNull(ReminderScheduler.active(config, "cholesterol",
+        assertNull(ReminderScheduler.active(config, "cholesterol",
                 ReminderScheduler.PHASE_CONFIRMATION));
     }
 

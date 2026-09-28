@@ -211,8 +211,14 @@ public final class CallActivity extends android.app.Activity {
         LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, Ui.dp(this, 54));
         headerParams.gravity = Gravity.CENTER_HORIZONTAL;
-        page.addView(connectedHeader(AppLanguage.caller(language),
-                session.getBoolean("speakerOn", false)), headerParams);
+        boolean textReminder = session.getBoolean("textReminder", false);
+        if (textReminder) {
+            TextView title = centered(reminderTitle(language), 20, Ui.GARDEN_INK, true);
+            page.addView(title, Ui.matchWrap());
+        } else {
+            page.addView(connectedHeader(AppLanguage.caller(language),
+                    session.getBoolean("speakerOn", false)), headerParams);
+        }
 
         View space = new View(this);
         page.addView(space, new LinearLayout.LayoutParams(1, 0, 1));
@@ -242,6 +248,20 @@ public final class CallActivity extends android.app.Activity {
         interactionSheet.addView(question, Ui.matchWrap());
         interactionSheet.addView(Ui.spacer(this, 24));
 
+        if (session.getBoolean("showTextContinue", false)) {
+            TextView okay = centered(AppLanguage.ui(language, "Okay"), 18, Ui.GARDEN_INK, true);
+            okay.setBackground(Ui.actionBackground(this, Ui.PRIMARY, 22));
+            okay.setOnClickListener(v -> {
+                if (optionSubmitting) return;
+                optionSubmitting = true;
+                v.setEnabled(false);
+                startService(new Intent(this, CallService.class)
+                        .setAction(CallService.ACTION_CONTINUE)
+                        .putExtra(CallService.EXTRA_OPTION_STEP, step));
+            });
+            interactionSheet.addView(okay, optionParams());
+        }
+
         if (session.getBoolean("showDelayOptions", false)
                 && !session.getBoolean("finalizing", false)) {
             interactionSheet.addView(delayOptions(step, false), delayOptionParams());
@@ -257,8 +277,17 @@ public final class CallActivity extends android.app.Activity {
                 interactionSheet.addView(remindLaterOptions(remindLaterLabel, step));
             }
         }
-        page.addView(interactionSheet, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        if (textReminder) {
+            android.widget.ScrollView scroll = new android.widget.ScrollView(this);
+            scroll.setFillViewport(false);
+            scroll.setClipToPadding(false);
+            scroll.addView(interactionSheet);
+            page.addView(scroll, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, 0, 8f));
+        } else {
+            page.addView(interactionSheet, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        }
         page.addView(new View(this), new LinearLayout.LayoutParams(1, 0, 1));
         setContentView(page);
     }

@@ -11,6 +11,7 @@ public final class AlarmReceiver extends BroadcastReceiver {
         if (intent == null) return;
         String id = intent.getStringExtra(ReminderScheduler.EXTRA_ID);
         String phase = intent.getStringExtra(ReminderScheduler.EXTRA_PHASE);
+        if (ReminderScheduler.PHASE_CONFIRMATION.equals(phase)) return;
         RemoteStore.Config config = new RemoteStore(context).load();
         RemoteStore.Schedule schedule = ReminderScheduler.active(config, id, phase);
         boolean retry = intent.getBooleanExtra(ReminderScheduler.EXTRA_RETRY, false);

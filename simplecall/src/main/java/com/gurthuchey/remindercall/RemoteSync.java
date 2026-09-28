@@ -204,7 +204,8 @@ final class RemoteSync {
                 schedule.put("minute", item.minute);
                 schedule.put("days", item.days);
                 schedule.put("preMinutes", item.preMinutes);
-                schedule.put("confirmationMinutes", item.confirmationMinutes);
+                schedule.put("confirmationMinutes", 0);
+                schedule.put("deliveryMode", item.deliveryMode);
                 schedule.put("medicineKey", "generic");
                 schedule.put("enabled", true);
                 List<Map<String, Object>> questions = new ArrayList<>();

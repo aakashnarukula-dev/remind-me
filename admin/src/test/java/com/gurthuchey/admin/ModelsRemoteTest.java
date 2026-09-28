@@ -41,7 +41,7 @@ public final class ModelsRemoteTest {
         assertEquals(23, parsed.hour);
         assertEquals(0, parsed.minute);
         assertEquals(180, parsed.preMinutes);
-        assertEquals(180, parsed.confirmationMinutes);
+        assertEquals(0, parsed.confirmationMinutes);
         assertEquals(127, parsed.days);
         assertTrue(parsed.enabled);
     }
@@ -50,6 +50,15 @@ public final class ModelsRemoteTest {
         Models.Schedule parsed = Models.Schedule.fromRemote(
                 schedule("Legacy medicine", 8, 0, true));
         assertEquals(0, parsed.confirmationMinutes);
+    }
+
+    @Test public void deliveryModeIsPreservedAndDefaultsToCall() {
+        Map<String, Object> item = schedule("Morning", 8, 0, true);
+        assertEquals("call", Models.Schedule.fromRemote(item).deliveryMode);
+        item.put("deliveryMode", "reminder");
+        assertTrue(Models.Schedule.fromRemote(item).textReminder());
+        item.put("deliveryMode", "unsupported");
+        assertEquals("call", Models.Schedule.fromRemote(item).deliveryMode);
     }
 
     @Test public void oversizedRemoteTextAndSchedulesAreBounded() {

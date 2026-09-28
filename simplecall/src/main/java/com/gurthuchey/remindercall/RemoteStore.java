@@ -132,7 +132,8 @@ final class RemoteStore {
         int minute;
         int days;
         int preMinutes;
-        int confirmationMinutes;
+        int confirmationMinutes; // Legacy field; confirmation calls are retired.
+        String deliveryMode = "call";
         boolean enabled;
         final List<ScriptQuestion> questions = new ArrayList<>();
 
@@ -144,12 +145,12 @@ final class RemoteStore {
             schedule.category = category(text(data.get("category"),
                     text(data.get("kind"), "medicine")));
             schedule.language = AppLanguage.normalize(text(data.get("language"), "te"));
+            schedule.deliveryMode = "reminder".equals(data.get("deliveryMode")) ? "reminder" : "call";
             schedule.hour = clamp(number(data.get("hour"), 8).intValue(), 0, 23);
             schedule.minute = clamp(number(data.get("minute"), 0).intValue(), 0, 59);
             schedule.days = number(data.get("days"), 0b1111111).intValue() & 0b1111111;
             schedule.preMinutes = clamp(number(data.get("preMinutes"), 0).intValue(), 0, 180);
-            schedule.confirmationMinutes = clamp(
-                    number(data.get("confirmationMinutes"), 0).intValue(), 0, 180);
+            schedule.confirmationMinutes = 0;
             schedule.enabled = !(data.get("enabled") instanceof Boolean) || (Boolean) data.get("enabled");
             Object rawQuestions = data.get("questions");
             if (rawQuestions instanceof List) {
@@ -181,11 +182,12 @@ final class RemoteStore {
             schedule.category = category(json.optString("category",
                     json.optString("kind", "medicine")));
             schedule.language = AppLanguage.normalize(json.optString("language", "te"));
+            schedule.deliveryMode = "reminder".equals(json.optString("deliveryMode")) ? "reminder" : "call";
             schedule.hour = clamp(json.getInt("hour"), 0, 23);
             schedule.minute = clamp(json.getInt("minute"), 0, 59);
             schedule.days = json.getInt("days") & 0b1111111;
             schedule.preMinutes = clamp(json.optInt("preMinutes", 0), 0, 180);
-            schedule.confirmationMinutes = clamp(json.optInt("confirmationMinutes", 0), 0, 180);
+            schedule.confirmationMinutes = 0;
             schedule.enabled = json.optBoolean("enabled", true);
             JSONArray questions = json.optJSONArray("questions");
             if (questions != null) {
@@ -217,10 +219,13 @@ final class RemoteStore {
                     .put("language", language)
                     .put("hour", hour)
                     .put("minute", minute).put("days", days).put("preMinutes", preMinutes)
-                    .put("confirmationMinutes", confirmationMinutes)
+                    .put("confirmationMinutes", 0)
+                    .put("deliveryMode", deliveryMode)
                     .put("questions", items)
                     .put("enabled", enabled);
         }
+
+        boolean textReminder() { return "reminder".equals(deliveryMode); }
 
         boolean custom() { return !"medicine".equals(category); }
 

@@ -88,7 +88,8 @@ final class Models {
         int minute = 0;
         int days = 0b1111111;
         int preMinutes = 30;
-        int confirmationMinutes;
+        int confirmationMinutes; // Legacy field; confirmation calls are retired.
+        String deliveryMode = "call";
         boolean enabled = true;
         String medicineKey = "generic";
         final List<ScriptQuestion> questions = new ArrayList<>();
@@ -103,7 +104,8 @@ final class Models {
                     .put("minute", minute)
                     .put("days", days)
                     .put("preMinutes", preMinutes)
-                    .put("confirmationMinutes", confirmationMinutes)
+                    .put("confirmationMinutes", 0)
+                    .put("deliveryMode", deliveryMode)
                     .put("medicineKey", medicineKey)
                     .put("questions", questionsJson())
                     .put("enabled", enabled);
@@ -122,12 +124,12 @@ final class Models {
             item.category = category(json.optString("category",
                     json.optString("kind", "medicine")));
             item.language = AppLanguage.normalize(json.optString("language", "te"));
+            item.deliveryMode = "reminder".equals(json.optString("deliveryMode")) ? "reminder" : "call";
             item.hour = Math.max(0, Math.min(23, json.optInt("hour", 8)));
             item.minute = Math.max(0, Math.min(59, json.optInt("minute", 0)));
             item.days = json.optInt("days", 0b1111111) & 0b1111111;
             item.preMinutes = Math.max(0, Math.min(180, json.optInt("preMinutes", 30)));
-            item.confirmationMinutes = Math.max(0, Math.min(180,
-                    json.optInt("confirmationMinutes", 0)));
+            item.confirmationMinutes = 0;
             item.medicineKey = clean(json.optString("medicineKey", "generic"), 24, "generic");
             item.enabled = json.optBoolean("enabled", true);
             JSONArray questions = json.optJSONArray("questions");
@@ -148,12 +150,12 @@ final class Models {
             item.category = category(text(value.get("category"),
                     text(value.get("kind"), "medicine")));
             item.language = AppLanguage.normalize(text(value.get("language"), "te"));
+            item.deliveryMode = "reminder".equals(value.get("deliveryMode")) ? "reminder" : "call";
             item.hour = Math.max(0, Math.min(23, number(value.get("hour"), 8)));
             item.minute = Math.max(0, Math.min(59, number(value.get("minute"), 0)));
             item.days = number(value.get("days"), 0b1111111) & 0b1111111;
             item.preMinutes = Math.max(0, Math.min(180, number(value.get("preMinutes"), 30)));
-            item.confirmationMinutes = Math.max(0, Math.min(180,
-                    number(value.get("confirmationMinutes"), 0)));
+            item.confirmationMinutes = 0;
             item.medicineKey = clean(text(value.get("medicineKey"), "generic"), 24, "generic");
             Object active = value.get("enabled");
             item.enabled = !(active instanceof Boolean) || (Boolean) active;
@@ -172,6 +174,8 @@ final class Models {
             item.language = item.detectedLanguage();
             return item;
         }
+
+        boolean textReminder() { return "reminder".equals(deliveryMode); }
 
         boolean custom() { return !"medicine".equals(category); }
 

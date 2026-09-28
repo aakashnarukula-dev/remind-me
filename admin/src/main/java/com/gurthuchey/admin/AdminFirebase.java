@@ -289,7 +289,8 @@ final class AdminFirebase {
             schedule.put("minute", item.minute);
             schedule.put("days", item.days);
             schedule.put("preMinutes", item.preMinutes);
-            schedule.put("confirmationMinutes", item.confirmationMinutes);
+            schedule.put("confirmationMinutes", 0);
+            schedule.put("deliveryMode", item.deliveryMode);
             schedule.put("medicineKey", item.medicineKey);
             schedule.put("enabled", item.enabled);
             List<Map<String, Object>> questions = new ArrayList<>();
