@@ -729,19 +729,17 @@ public final class MainActivity extends FragmentActivity {
     private View statusPill(RemoteStore.Schedule schedule, String kind) {
         boolean completed = DailyCallStatus.COMPLETED.equals(kind);
         boolean skipped = DailyCallStatus.SKIPPED.equals(kind);
-        boolean incomplete = DailyCallStatus.isIncomplete(kind);
         String label = completed ? DailyCallStatus.completedLabel(currentLanguage())
                 : skipped ? DailyCallStatus.skippedLabel(currentLanguage())
-                : incomplete ? DailyCallStatus.incompleteLabel(currentLanguage())
                 : DailyCallStatus.NOT_TODAY.equals(kind)
                 ? DailyCallStatus.notTodayLabel(currentLanguage())
                 : DailyCallStatus.pendingLabel(currentLanguage());
         int ink = completed ? Color.rgb(38, 117, 72)
                 : skipped ? Ui.DANGER
-                : incomplete ? Color.rgb(139, 98, 25) : Color.rgb(83, 99, 116);
+                : Color.rgb(83, 99, 116);
         int background = completed ? Color.rgb(226, 245, 233)
                 : skipped ? Color.rgb(253, 235, 237)
-                : incomplete ? Color.rgb(255, 242, 211) : Color.rgb(232, 239, 245);
+                : Color.rgb(232, 239, 245);
         TextView pill = Ui.text(this, label, 9, ink, true);
         pill.setGravity(Gravity.CENTER);
         pill.setSingleLine(true);
@@ -813,18 +811,18 @@ public final class MainActivity extends FragmentActivity {
 
     private View dailyStatusControls(RemoteStore.Schedule schedule, Runnable changed) {
         LinearLayout choices = new LinearLayout(this);
-        String[] labels = {DailyCallStatus.completedLabel(currentLanguage()),
-                DailyCallStatus.incompleteLabel(currentLanguage()),
-                DailyCallStatus.skippedLabel(currentLanguage())};
-        int[] colors = {Color.rgb(38, 117, 72), Color.rgb(139, 98, 25), Ui.DANGER};
-        int[] backgrounds = {Color.rgb(226, 245, 233), Color.rgb(255, 242, 211),
+        String[] labels = {DailyCallStatus.pendingLabel(currentLanguage()),
+                DailyCallStatus.completedLabel(currentLanguage()),
+                AppLanguage.ui(currentLanguage(), "Skip for today")};
+        int[] colors = {Color.rgb(83, 99, 116), Color.rgb(38, 117, 72), Ui.DANGER};
+        int[] backgrounds = {Color.rgb(232, 239, 245), Color.rgb(226, 245, 233),
                 Color.rgb(253, 235, 237)};
         TextView[] controls = new TextView[3];
         Runnable update = () -> {
             String kind = dailyCallStatus.display(schedule, System.currentTimeMillis()).kind;
-            int selected = DailyCallStatus.COMPLETED.equals(kind) ? 0
+            int selected = DailyCallStatus.COMPLETED.equals(kind) ? 1
                     : DailyCallStatus.SKIPPED.equals(kind) ? 2
-                    : DailyCallStatus.isIncomplete(kind) ? 1 : -1;
+                    : DailyCallStatus.NOT_TODAY.equals(kind) ? -1 : 0;
             for (int i = 0; i < controls.length; i++) {
                 controls[i].setSelected(i == selected);
                 controls[i].setBackground(Ui.roundedWithStroke(backgrounds[i], 12,
@@ -840,6 +838,9 @@ public final class MainActivity extends FragmentActivity {
             control.setContentDescription("Today's status: " + labels[index]);
             control.setOnClickListener(v -> {
                 if (choice == 0) {
+                    dailyCallStatus.markPending(schedule.id);
+                    ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
+                } else if (choice == 1) {
                     ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEAL);
                     ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_MEDICINE);
                     ReminderScheduler.cancelRetry(this, schedule.id, ReminderScheduler.PHASE_CONFIRMATION);
@@ -849,9 +850,6 @@ public final class MainActivity extends FragmentActivity {
                                 .setAction(CallService.ACTION_COMPLETE_TODAY)
                                 .putExtra(ReminderScheduler.EXTRA_ID, schedule.id));
                     }
-                } else if (choice == 1) {
-                    dailyCallStatus.markIncomplete(schedule.id);
-                    ReminderScheduler.scheduleAll(this, new RemoteStore(this).load());
                 } else {
                     dailyCallStatus.markSkippedToday(schedule.id);
                     ReminderScheduler.skipRemainingToday(this, schedule.id);

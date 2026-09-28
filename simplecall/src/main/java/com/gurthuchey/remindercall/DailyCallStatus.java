@@ -14,6 +14,7 @@ final class DailyCallStatus {
     static final String ACTION_CHANGED = "com.gurthuchey.remindercall.DAILY_STATUS_CHANGED";
 
     static final String UPCOMING = "upcoming";
+    static final String PENDING = "pending";
     static final String CALLING = "calling";
     static final String RETRY = "retry";
     static final String COMPLETED = "completed";
@@ -30,6 +31,7 @@ final class DailyCallStatus {
     private static final String STATE_RETRY = "retry";
     private static final String STATE_COMPLETED = "completed";
     private static final String STATE_INCOMPLETE = "incomplete";
+    private static final String STATE_PENDING = "pending";
     private static final String STATE_SKIPPED = "skipped_today";
     private static final long DUE_GRACE_MS = 90_000L;
     private static final long STALE_RING_MS = 2L * 60_000L;
@@ -93,9 +95,9 @@ final class DailyCallStatus {
                 occurrenceDay(scheduleId, phase, now));
     }
 
-    void markIncomplete(String scheduleId) {
+    void markPending(String scheduleId) {
         long now = System.currentTimeMillis();
-        write(scheduleId, ReminderScheduler.PHASE_MEDICINE, STATE_INCOMPLETE, 0L, now,
+        write(scheduleId, ReminderScheduler.PHASE_MEDICINE, STATE_PENDING, 0L, now,
                 displayDay(scheduleId, now));
     }
 
@@ -145,7 +147,7 @@ final class DailyCallStatus {
         String kind = resolve(scheduledToday, scheduledAt, calling, retryAt > 0L,
                 isCompleted(primary), false, false, now);
         kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
-        kind = applyManualIncomplete(kind, isIncomplete(primary));
+        kind = applyManualPending(kind, isPending(primary));
         kind = applySkippedToday(kind, isSkipped(primary));
         return new Display(kind, retryAt);
     }
@@ -178,22 +180,13 @@ final class DailyCallStatus {
         return kind;
     }
 
-    static String applyManualIncomplete(String kind, boolean manuallyIncomplete) {
-        if (!manuallyIncomplete || CALLING.equals(kind) || RETRY.equals(kind)) return kind;
-        return MISSED;
+    static String applyManualPending(String kind, boolean manuallyPending) {
+        if (!manuallyPending || CALLING.equals(kind) || RETRY.equals(kind)) return kind;
+        return PENDING;
     }
 
     static String applySkippedToday(String kind, boolean skippedToday) {
         return skippedToday ? SKIPPED : kind;
-    }
-
-    static String incompleteLabel(String language) {
-        int index = "te".equals(language) ? 1 : "hi".equals(language) ? 2
-                : "ta".equals(language) ? 3 : "kn".equals(language) ? 4
-                : "ml".equals(language) ? 5 : 0;
-        String[] values = {"Not completed", "పూర్తి కాలేదు", "पूरा नहीं हुआ",
-                "முடிக்கவில்லை", "ಪೂರ್ಣಗೊಂಡಿಲ್ಲ", "പൂർത്തിയായില്ല"};
-        return values[index];
     }
 
     static String completedLabel(String language) {
@@ -400,8 +393,9 @@ final class DailyCallStatus {
         return entry != null && STATE_COMPLETED.equals(entry.state);
     }
 
-    private static boolean isIncomplete(Entry entry) {
-        return entry != null && STATE_INCOMPLETE.equals(entry.state);
+    private static boolean isPending(Entry entry) {
+        return entry != null && (STATE_PENDING.equals(entry.state)
+                || STATE_INCOMPLETE.equals(entry.state));
     }
 
     private static boolean isSkipped(Entry entry) {

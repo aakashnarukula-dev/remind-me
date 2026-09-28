@@ -71,7 +71,7 @@ public final class DailyCallStatusTest {
                 false, 1_000L, false, false, false, false, false, 100_000L));
     }
 
-    @Test public void onlyUnfinishedDueCallsReceiveThePill() {
+    @Test public void activeOrMissedCallsRemainInternallyIncomplete() {
         org.junit.Assert.assertTrue(DailyCallStatus.isIncomplete(DailyCallStatus.CALLING));
         org.junit.Assert.assertTrue(DailyCallStatus.isIncomplete(DailyCallStatus.RETRY));
         org.junit.Assert.assertTrue(DailyCallStatus.isIncomplete(DailyCallStatus.MISSED));
@@ -90,16 +90,18 @@ public final class DailyCallStatusTest {
                 DailyCallStatus.COMPLETED, 1_000L, 2_000L));
     }
 
-    @Test public void manualIncompleteOverridesDerivedCardStatus() {
-        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applyManualIncomplete(
+    @Test public void manualPendingOverridesDerivedCardStatus() {
+        assertEquals(DailyCallStatus.PENDING, DailyCallStatus.applyManualPending(
                 DailyCallStatus.COMPLETED, true));
-        assertEquals(DailyCallStatus.MISSED, DailyCallStatus.applyManualIncomplete(
+        assertEquals(DailyCallStatus.PENDING, DailyCallStatus.applyManualPending(
                 DailyCallStatus.UPCOMING, true));
-        assertEquals(DailyCallStatus.CALLING, DailyCallStatus.applyManualIncomplete(
+        assertEquals(DailyCallStatus.PENDING, DailyCallStatus.applyManualPending(
+                DailyCallStatus.MISSED, true));
+        assertEquals(DailyCallStatus.CALLING, DailyCallStatus.applyManualPending(
                 DailyCallStatus.CALLING, true));
-        assertEquals(DailyCallStatus.RETRY, DailyCallStatus.applyManualIncomplete(
+        assertEquals(DailyCallStatus.RETRY, DailyCallStatus.applyManualPending(
                 DailyCallStatus.RETRY, true));
-        assertEquals(DailyCallStatus.COMPLETED, DailyCallStatus.applyManualIncomplete(
+        assertEquals(DailyCallStatus.COMPLETED, DailyCallStatus.applyManualPending(
                 DailyCallStatus.COMPLETED, false));
     }
 
