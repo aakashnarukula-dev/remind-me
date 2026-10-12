@@ -2,6 +2,8 @@ package com.gurthuchey.admin;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.content.DialogInterface;
 import android.app.Dialog;
 import android.app.TimePickerDialog;
 import android.content.ClipData;
@@ -26,6 +28,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.HorizontalScrollView;
@@ -47,6 +50,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Calendar;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
@@ -723,6 +727,13 @@ public final class MainActivity extends FragmentActivity {
         phoneState.setPadding(0, Ui.dp(this, 12), 0, 0);
         card.addView(phoneState);
 
+        long now = System.currentTimeMillis();
+        if (member.skip != null && !member.skip.isOver(now)) {
+            TextView skipping = Ui.text(this, skipSummary(member.skip, now), 13, Ui.DANGER, true);
+            skipping.setPadding(0, Ui.dp(this, 8), 0, 0);
+            card.addView(skipping);
+        }
+
         if (member.schedules.isEmpty()) {
             TextView empty = Ui.text(this, "No reminders yet.", 14, Ui.MUTED, false);
             empty.setPadding(0, Ui.dp(this, 20), 0, Ui.dp(this, 8));
@@ -762,7 +773,98 @@ public final class MainActivity extends FragmentActivity {
         addMedicine.setOnClickListener(v -> showScheduleDialog(member, null));
         actions.addView(addMedicine, new LinearLayout.LayoutParams(0, Ui.dp(this, 50), 1f));
         card.addView(actions, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, this, 0, 16, 0, 0));
+
+        Button skip = Ui.button(this, "Skip reminders", Ui.RAISED2, Ui.INK);
+        skip.setTextSize(12);
+        skip.setContentDescription("Skip all reminders for " + member.name);
+        skip.setOnClickListener(v -> showSkipDialog(member));
+        card.addView(skip, Ui.margins(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 46), this, 0, 8, 0, 0));
         return card;
+    }
+
+    private String skipSummary(SkipRange skip, long now) {
+        if (!skip.covers(now)) {
+            return "Reminders will be skipped " + shortDate(skip.from) + " – " + shortDate(skip.until);
+        }
+        if (skip.until.equals(SkipRange.dayKey(now))) return "All reminders skipped today";
+        return "All reminders skipped until " + shortDate(skip.until);
+    }
+
+    private static String shortDate(String isoDay) {
+        Calendar day = Calendar.getInstance();
+        day.clear();
+        day.set(Integer.parseInt(isoDay.substring(0, 4)),
+                Integer.parseInt(isoDay.substring(5, 7)) - 1,
+                Integer.parseInt(isoDay.substring(8, 10)));
+        return new java.text.SimpleDateFormat("d MMM", Locale.ENGLISH).format(day.getTime());
+    }
+
+    private void showSkipDialog(Models.Member member) {
+        long now = System.currentTimeMillis();
+        boolean skipping = member.skip != null && !member.skip.isOver(now);
+        String today = SkipRange.dayKey(now);
+        String[] choices = skipping
+                ? new String[]{"Skip today", "Choose days", "Resume reminders"}
+                : new String[]{"Skip today", "Choose days"};
+        new AlertDialog.Builder(this)
+                .setTitle("Skip reminders for " + member.name)
+                .setItems(choices, (dialog, which) -> {
+                    if (which == 0) saveSkip(member, SkipRange.of(today, today));
+                    else if (which == 1) pickSkipDays(member);
+                    else saveSkip(member, null);
+                })
+                .setNegativeButton("Cancel", null)
+                .show();
+    }
+
+    /** Picks the first, then the last skipped day; at most {@link SkipRange#MAX_DAYS} days. */
+    private void pickSkipDays(Models.Member member) {
+        long now = System.currentTimeMillis();
+        pickDay("Next", now, (from, fromTime) ->
+                pickDay("Skip these days", fromTime, (until, untilTime) -> {
+                    SkipRange range = SkipRange.of(from, until);
+                    if (range != null) saveSkip(member, range);
+                }));
+    }
+
+    private interface DayChosen { void chosen(String isoDay, long time); }
+
+    private void pickDay(String confirm, long earliest, DayChosen chosen) {
+        Calendar start = Calendar.getInstance();
+        start.setTimeInMillis(earliest);
+        DatePickerDialog picker = new DatePickerDialog(this, null, start.get(Calendar.YEAR), start.get(Calendar.MONTH), start.get(Calendar.DAY_OF_MONTH));
+        start.set(Calendar.HOUR_OF_DAY, 0);
+        start.set(Calendar.MINUTE, 0);
+        start.set(Calendar.SECOND, 0);
+        start.set(Calendar.MILLISECOND, 0);
+        picker.getDatePicker().setMinDate(start.getTimeInMillis());
+        start.add(Calendar.DAY_OF_YEAR, SkipRange.MAX_DAYS - 1);
+        picker.getDatePicker().setMaxDate(start.getTimeInMillis());
+        // Samsung's calendar hides dialog titles, so the confirm button says which pick this is.
+        picker.setButton(DialogInterface.BUTTON_POSITIVE, confirm, (dialog, which) -> {
+            DatePicker date = picker.getDatePicker();
+            Calendar picked = Calendar.getInstance();
+            picked.clear();
+            picked.set(date.getYear(), date.getMonth(), date.getDayOfMonth());
+            chosen.chosen(SkipRange.dayKey(picked.getTimeInMillis()), picked.getTimeInMillis());
+        });
+        picker.show();
+    }
+
+    private void saveSkip(Models.Member member, SkipRange skip) {
+        if (firebase == null) return;
+        SkipRange previous = member.skip;
+        member.skip = skip;
+        store.save(members);
+        render();
+        firebase.updateSkip(member.id, skip, success -> runOnUiThread(() -> {
+            if (success) return;
+            member.skip = previous;
+            store.save(members);
+            render();
+            Toast.makeText(this, "Could not update reminders. Check the internet and try again.",
+                    Toast.LENGTH_LONG).show();
+        }));
     }
 
     private void showPairingCode(Models.Member member, boolean reconnecting) {

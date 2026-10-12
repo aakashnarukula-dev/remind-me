@@ -119,6 +119,7 @@ final class DailyCallStatus {
 
     boolean isSkippedToday(String scheduleId, long now) {
         if (scheduleId == null || scheduleId.trim().isEmpty()) return false;
+        if (!"test-call".equals(scheduleId) && isGloballySkipped(now)) return true;
         return isSkipped(readForDay(scheduleId, ReminderScheduler.PHASE_MEDICINE,
                 dayKey(now)));
     }
@@ -149,7 +150,14 @@ final class DailyCallStatus {
         kind = applyTrackingBaseline(kind, scheduledAt, trackingStartedAt);
         kind = applyManualPending(kind, isPending(primary));
         kind = applySkippedToday(kind, isSkipped(primary));
+        kind = applyGlobalSkip(kind, isGloballySkipped(referenceTime));
         return new Display(kind, retryAt);
+    }
+
+    /** True when the member chose to skip every reminder on the local day of {@code time}. */
+    boolean isGloballySkipped(long time) {
+        SkipRange skip = new RemoteStore(context).skip();
+        return skip != null && skip.covers(time);
     }
 
     void register(SharedPreferences.OnSharedPreferenceChangeListener listener) {
@@ -187,6 +195,12 @@ final class DailyCallStatus {
 
     static String applySkippedToday(String kind, boolean skippedToday) {
         return skippedToday ? SKIPPED : kind;
+    }
+
+    /** A skipped day keeps reminders that were not due anyway, or were already done. */
+    static String applyGlobalSkip(String kind, boolean skippedDay) {
+        if (!skippedDay || NOT_TODAY.equals(kind) || COMPLETED.equals(kind)) return kind;
+        return SKIPPED;
     }
 
     static String completedLabel(String language) {

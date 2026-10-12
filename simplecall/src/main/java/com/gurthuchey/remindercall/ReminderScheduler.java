@@ -38,14 +38,20 @@ final class ReminderScheduler {
         if (config == null) return;
         long now = System.currentTimeMillis();
         DailyCallStatus statuses = new DailyCallStatus(context);
+        boolean allSkippedToday = config.skip != null && config.skip.covers(now);
         for (RemoteStore.Schedule schedule : config.schedules) {
             cancelRetry(context, schedule.id, PHASE_CONFIRMATION);
+            if (allSkippedToday) {
+                // A skipped day drops every pending retry and remind-later call too.
+                cancelRetry(context, schedule.id, PHASE_MEDICINE);
+                cancelRetry(context, schedule.id, PHASE_MEAL);
+            }
             if (!schedule.enabled) continue;
             long scheduleAfter = schedulingFloor(after, now,
                     statuses.isSkippedToday(schedule.id, now));
-            schedulePhase(context, schedule, PHASE_MEDICINE, scheduleAfter);
+            schedulePhase(context, schedule, PHASE_MEDICINE, scheduleAfter, config.skip);
             if (!schedule.custom() && schedule.preMinutes > 0) {
-                schedulePhase(context, schedule, PHASE_MEAL, scheduleAfter);
+                schedulePhase(context, schedule, PHASE_MEAL, scheduleAfter, config.skip);
             }
         }
     }
@@ -156,7 +162,7 @@ final class ReminderScheduler {
         long now = System.currentTimeMillis();
         long after = schedulingFloor(now + 60_000L, now,
                 new DailyCallStatus(context).isSkippedToday(id, now));
-        schedulePhase(context, schedule, phase, after);
+        schedulePhase(context, schedule, phase, after, config.skip);
     }
 
     static void scheduleRetry(Context context, String id, String phase) {
@@ -300,9 +306,9 @@ final class ReminderScheduler {
         if (schedule == null) return;
         long now = System.currentTimeMillis();
         long after = skipScheduleAfter(now, carriedFromPreviousDay);
-        schedulePhase(context, schedule, PHASE_MEDICINE, after);
+        schedulePhase(context, schedule, PHASE_MEDICINE, after, config.skip);
         if (!schedule.custom() && schedule.preMinutes > 0) {
-            schedulePhase(context, schedule, PHASE_MEAL, after);
+            schedulePhase(context, schedule, PHASE_MEAL, after, config.skip);
         }
     }
 
@@ -364,9 +370,22 @@ final class ReminderScheduler {
         return best;
     }
 
-    private static void schedulePhase(Context context, RemoteStore.Schedule schedule,
-            String phase, long after) {
+    /**
+     * Like {@link #nextTrigger(RemoteStore.Schedule, String, long)}, but never on a day the
+     * whole member is skipping. A meal call belongs to the day of its medicine dose.
+     */
+    static long nextTrigger(RemoteStore.Schedule schedule, String phase, long after,
+            SkipRange skip) {
         long at = nextTrigger(schedule, phase, after);
+        if (skip == null || at == Long.MAX_VALUE) return at;
+        long lead = PHASE_MEAL.equals(phase) ? schedule.preMinutes * 60_000L : 0L;
+        if (!skip.covers(at + lead)) return at;
+        return nextTrigger(schedule, phase, Math.max(after, skip.resumeAt() - lead));
+    }
+
+    private static void schedulePhase(Context context, RemoteStore.Schedule schedule,
+            String phase, long after, SkipRange skip) {
+        long at = nextTrigger(schedule, phase, after, skip);
         if (at == Long.MAX_VALUE) return;
         set(context, at, alarmIntent(context, schedule.id, phase, true));
     }

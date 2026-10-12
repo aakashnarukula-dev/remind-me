@@ -259,11 +259,53 @@ final class AppLanguage {
         return best < 0 ? normalize(fallback) : CODES[best];
     }
 
+    // Skip-reminder texts, in CODES order without English: te, hi, ta, kn, ml.
+    private static final java.util.Map<String, String[]> SKIP_TEXT = new java.util.HashMap<>();
+    static {
+        SKIP_TEXT.put("Skip reminders", new String[]{"రిమైండర్లు ఆపండి", "रिमाइंडर रोकें",
+                "நினைவூட்டல்களை நிறுத்து", "ಜ್ಞಾಪನೆಗಳನ್ನು ನಿಲ್ಲಿಸಿ", "ഓർമ്മപ്പെടുത്തലുകൾ നിർത്തുക"});
+        SKIP_TEXT.put("Skip today", new String[]{"ఈ రోజు అన్నీ వద్దు", "आज सब छोड़ें",
+                "இன்று எல்லாம் வேண்டாம்", "ಇಂದು ಎಲ್ಲಾ ಬೇಡ", "ഇന്ന് എല്ലാം ഒഴിവാക്കുക"});
+        SKIP_TEXT.put("Choose days", new String[]{"రోజులు ఎంచుకోండి", "दिन चुनें",
+                "நாட்களைத் தேர்ந்தெடு", "ದಿನಗಳನ್ನು ಆರಿಸಿ", "ദിവസങ്ങൾ തിരഞ്ഞെടുക്കുക"});
+        SKIP_TEXT.put("Next", new String[]{"తర్వాత", "आगे", "அடுத்து", "ಮುಂದೆ", "അടുത്തത്"});
+        SKIP_TEXT.put("Skip these days", new String[]{"ఈ రోజులు ఆపండి", "ये दिन छोड़ें",
+                "இந்த நாட்களைத் தவிர்", "ಈ ದಿನಗಳನ್ನು ಬಿಡಿ", "ഈ ദിവസങ്ങൾ ഒഴിവാക്കുക"});
+        SKIP_TEXT.put("Resume reminders", new String[]{"రిమైండర్లు మళ్లీ ప్రారంభించండి",
+                "रिमाइंडर फिर शुरू करें", "நினைவூட்டல்களை மீண்டும் தொடங்கு",
+                "ಜ್ಞಾಪನೆಗಳನ್ನು ಮತ್ತೆ ಆರಂಭಿಸಿ", "ഓർമ്മപ്പെടുത്തലുകൾ വീണ്ടും തുടങ്ങുക"});
+        SKIP_TEXT.put("All reminders skipped today", new String[]{
+                "ఈ రోజు అన్ని రిమైండర్లు ఆపారు", "आज सभी रिमाइंडर रुके हैं",
+                "இன்று எல்லா நினைவூட்டல்களும் நிறுத்தப்பட்டன", "ಇಂದು ಎಲ್ಲಾ ಜ್ಞಾಪನೆಗಳು ನಿಂತಿವೆ",
+                "ഇന്ന് എല്ലാ ഓർമ്മപ്പെടുത്തലുകളും നിർത്തി"});
+        SKIP_TEXT.put("All reminders skipped until %s", new String[]{
+                "%s వరకు అన్ని రిమైండర్లు ఆపారు", "%s तक सभी रिमाइंडर रुके हैं",
+                "%s வரை எல்லா நினைவூட்டல்களும் நிறுத்தப்பட்டன", "%s ವರೆಗೆ ಎಲ್ಲಾ ಜ್ಞಾಪನೆಗಳು ನಿಂತಿವೆ",
+                "%s വരെ എല്ലാ ഓർമ്മപ്പെടുത്തലുകളും നിർത്തി"});
+        SKIP_TEXT.put("Reminders will be skipped %s – %s", new String[]{
+                "%s – %s రిమైండర్లు ఆగుతాయి", "%s – %s रिमाइंडर रुकेंगे",
+                "%s – %s நினைவூட்டல்கள் நிறுத்தப்படும்", "%s – %s ಜ್ಞಾಪನೆಗಳು ನಿಲ್ಲುತ್ತವೆ",
+                "%s – %s ഓർമ്മപ്പെടുത്തലുകൾ നിർത്തും"});
+        SKIP_TEXT.put("Reminders come back on their own afterwards", new String[]{
+                "తర్వాత రిమైండర్లు తమంతట తామే మళ్లీ వస్తాయి",
+                "उसके बाद रिमाइंडर अपने आप फिर शुरू होंगे",
+                "அதன் பிறகு நினைவூட்டல்கள் தானாகவே மீண்டும் வரும்",
+                "ನಂತರ ಜ್ಞಾಪನೆಗಳು ತಾವಾಗಿಯೇ ಮತ್ತೆ ಬರುತ್ತವೆ",
+                "അതിനുശേഷം ഓർമ്മപ്പെടുത്തലുകൾ സ്വയം തിരികെ വരും"});
+    }
+
+    private static int codeIndex(String code) {
+        for (int i = 0; i < CODES.length; i++) if (CODES[i].equals(code)) return i;
+        return 0;
+    }
+
     static String ui(Context context, String english) { return ui(current(context), english); }
 
     static String ui(String code, String english) {
         String normalized = normalize(code);
         if (english == null || "en".equals(normalized)) return english;
+        String[] skip = SKIP_TEXT.get(english);
+        if (skip != null) return skip[codeIndex(normalized) - 1];
         if ("Hang up".equals(english)) {
             switch (normalized) {
                 case "te": return "కాల్ ముగించు"; case "hi": return "कॉल काटें";

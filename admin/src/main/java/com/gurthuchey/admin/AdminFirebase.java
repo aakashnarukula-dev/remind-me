@@ -98,6 +98,25 @@ final class AdminFirebase {
                 .addOnFailureListener(error -> report("Sync pending — will retry when online", true));
     }
 
+    /**
+     * Writes only the skip fields. Kept out of {@link #memberMap} so that publishing a stale
+     * local copy of the family can never undo a skip chosen on the member's phone.
+     */
+    void updateSkip(String memberId, SkipRange skip, DeleteCallback callback) {
+        if (!ready) {
+            callback.complete(false);
+            return;
+        }
+        Map<String, Object> value = new HashMap<>();
+        value.put("skipFrom", skip == null ? FieldValue.delete() : skip.from);
+        value.put("skipUntil", skip == null ? FieldValue.delete() : skip.until);
+        value.put("revision", FieldValue.increment(1L));
+        value.put("updatedAt", FieldValue.serverTimestamp());
+        memberReference(memberId).update(value)
+                .addOnSuccessListener(unused -> callback.complete(true))
+                .addOnFailureListener(error -> callback.complete(false));
+    }
+
     void deleteMember(String memberId, DeleteCallback callback) {
         if (!ready) {
             callback.complete(false);

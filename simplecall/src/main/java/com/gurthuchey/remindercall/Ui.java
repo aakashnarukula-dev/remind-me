@@ -167,6 +167,37 @@ final class Ui {
 
     static Drawable plusIcon(Context context) { return new PlusIcon(context); }
 
+    static Drawable pauseIcon(Context context, int color) { return new PauseIcon(context, color); }
+
+    private static final class PauseIcon extends Drawable {
+        private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final float half;
+        private final float gap;
+
+        PauseIcon(Context context, int color) {
+            float density = context.getResources().getDisplayMetrics().density;
+            half = 7 * density;
+            gap = 3.5f * density;
+            paint.setColor(color);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(Paint.Cap.ROUND);
+            paint.setStrokeWidth(2.5f * density);
+        }
+
+        @Override public void draw(Canvas canvas) {
+            float cx = getBounds().exactCenterX();
+            float cy = getBounds().exactCenterY();
+            canvas.drawLine(cx - gap, cy - half, cx - gap, cy + half, paint);
+            canvas.drawLine(cx + gap, cy - half, cx + gap, cy + half, paint);
+        }
+
+        @Override public void setAlpha(int alpha) { paint.setAlpha(alpha); }
+        @Override public void setColorFilter(android.graphics.ColorFilter filter) {
+            paint.setColorFilter(filter);
+        }
+        @Override public int getOpacity() { return PixelFormat.TRANSLUCENT; }
+    }
+
     private static final class PlusIcon extends Drawable {
         private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final float arm;

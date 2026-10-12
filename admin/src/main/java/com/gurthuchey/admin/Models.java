@@ -20,18 +20,21 @@ final class Models {
         String phoneE164 = "";
         String relation = "generic";
         String language = "en";
+        SkipRange skip;
         final List<Schedule> schedules = new ArrayList<>();
 
         JSONObject toJson() throws JSONException {
             JSONArray items = new JSONArray();
             for (Schedule schedule : schedules) items.put(schedule.toJson());
-            return new JSONObject()
+            JSONObject json = new JSONObject()
                     .put("id", id)
                     .put("name", name)
                     .put("phoneE164", phoneE164)
                     .put("relation", relation)
                     .put("language", language)
                     .put("schedules", items);
+            if (skip != null) json.put("skipFrom", skip.from).put("skipUntil", skip.until);
+            return json;
         }
 
         static Member fromJson(JSONObject json) throws JSONException {
@@ -42,6 +45,8 @@ final class Models {
             member.relation = clean(json.optString("relation", "generic"), 20, "generic");
             member.language = AppLanguage.normalize(json.optString("language",
                     defaultLanguage(member.phoneE164)));
+            member.skip = SkipRange.of(json.optString("skipFrom", null),
+                    json.optString("skipUntil", null));
             JSONArray items = json.optJSONArray("schedules");
             if (items != null) {
                 for (int i = 0; i < Math.min(50, items.length()); i++) {
@@ -59,6 +64,8 @@ final class Models {
             member.relation = clean(text(value.get("relation"), "generic"), 20, "generic");
             member.language = AppLanguage.normalize(text(value.get("language"),
                     defaultLanguage(member.phoneE164)));
+            member.skip = SkipRange.of(text(value.get("skipFrom"), null),
+                    text(value.get("skipUntil"), null));
             Object rawSchedules = value.get("schedules");
             if (rawSchedules instanceof List) {
                 int count = 0;

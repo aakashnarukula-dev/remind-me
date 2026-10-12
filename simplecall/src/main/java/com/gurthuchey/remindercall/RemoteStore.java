@@ -44,10 +44,21 @@ final class RemoteStore {
     }
 
     void save(Config config) throws Exception {
-        if (!preferences.edit().putString("config", config.toJson().toString())
-                .putLong("lastSync", System.currentTimeMillis()).commit()) {
+        SharedPreferences.Editor editor = preferences.edit()
+                .putString("config", config.toJson().toString())
+                .putLong("lastSync", System.currentTimeMillis());
+        if (config.skip == null) editor.remove("skipFrom").remove("skipUntil");
+        else editor.putString("skipFrom", config.skip.from)
+                .putString("skipUntil", config.skip.until);
+        if (!editor.commit()) {
             throw new IllegalStateException("Could not save the reminder schedule");
         }
+    }
+
+    /** The member's skipped days, kept beside the config so it is cheap to read per call. */
+    SkipRange skip() {
+        return SkipRange.of(preferences.getString("skipFrom", null),
+                preferences.getString("skipUntil", null));
     }
 
     long lastSync() { return preferences.getLong("lastSync", 0); }
@@ -74,6 +85,7 @@ final class RemoteStore {
         String memberName;
         String language = "en";
         long revision;
+        SkipRange skip;
         final List<Schedule> schedules = new ArrayList<>();
 
         static Config fromRemote(String id, Map<String, Object> data) {
@@ -83,6 +95,8 @@ final class RemoteStore {
                     60, "Family member");
             config.language = AppLanguage.normalize(text(data.get("language"), "te"));
             config.revision = Math.max(0, number(data.get("revision"), 0).longValue());
+            config.skip = SkipRange.of(text(data.get("skipFrom"), null),
+                    text(data.get("skipUntil"), null));
             Object raw = data.get("schedules");
             if (!(raw instanceof List)) throw new IllegalArgumentException("Missing schedules");
             int count = 0;
@@ -104,6 +118,8 @@ final class RemoteStore {
             config.memberName = clean(json.getString("memberName"), 60, "Family member");
             config.language = AppLanguage.normalize(json.optString("language", "te"));
             config.revision = Math.max(0, json.optLong("revision", 0));
+            config.skip = SkipRange.of(json.optString("skipFrom", null),
+                    json.optString("skipUntil", null));
             JSONArray items = json.getJSONArray("schedules");
             Set<String> ids = new HashSet<>();
             for (int i = 0; i < Math.min(50, items.length()); i++) {
@@ -117,9 +133,11 @@ final class RemoteStore {
         JSONObject toJson() throws Exception {
             JSONArray items = new JSONArray();
             for (Schedule item : schedules) items.put(item.toJson());
-            return new JSONObject().put("memberId", memberId).put("memberName", memberName)
-                    .put("language", language)
+            JSONObject json = new JSONObject().put("memberId", memberId)
+                    .put("memberName", memberName).put("language", language)
                     .put("revision", revision).put("schedules", items);
+            if (skip != null) json.put("skipFrom", skip.from).put("skipUntil", skip.until);
+            return json;
         }
     }
 

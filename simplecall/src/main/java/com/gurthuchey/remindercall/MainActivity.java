@@ -4,6 +4,8 @@ import android.Manifest;
 import android.app.ActivityManager;
 import android.app.AlarmManager;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
+import android.content.DialogInterface;
 import android.app.Dialog;
 import android.app.NotificationManager;
 import android.app.TimePickerDialog;
@@ -34,6 +36,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsetsController;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.FrameLayout;
@@ -234,6 +237,7 @@ public final class MainActivity extends FragmentActivity {
         body.setOrientation(LinearLayout.VERTICAL);
         body.setPadding(Ui.dp(this, 18), Ui.dp(this, 4), Ui.dp(this, 18), Ui.dp(this, 12));
         Ui.safeArea(body, true, false, true, true);
+        addSkipBanner(body, config);
         addSchedules(body, config);
         scroll.addView(body);
         page.addView(scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1));
@@ -255,6 +259,14 @@ public final class MainActivity extends FragmentActivity {
         LinearLayout.LayoutParams brandParams = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1);
         brandParams.setMarginStart(Ui.dp(this, 10));
         header.addView(brand, brandParams);
+        boolean skipping = config != null && config.skip != null
+                && !config.skip.isOver(System.currentTimeMillis());
+        TextView pause = new TextView(this);
+        pause.setBackground(Ui.actionBackground(this, skipping ? Ui.ACCENT : Ui.PRIMARY, 16));
+        pause.setForeground(Ui.pauseIcon(this, skipping ? Ui.WHITE : Ui.ACCENT));
+        pause.setContentDescription(AppLanguage.ui(this, "Skip reminders"));
+        pause.setOnClickListener(v -> showSkipDialog(config));
+        header.addView(pause, Ui.margins(Ui.dp(this, 44), Ui.dp(this, 44), this, 0, 0, 8, 0));
         TextView add = new TextView(this);
         add.setGravity(Gravity.CENTER);
         add.setBackground(Ui.actionBackground(this, Ui.ACCENT, 16));
@@ -765,6 +777,11 @@ public final class MainActivity extends FragmentActivity {
     }
 
     private void showDailyStatusDialog(RemoteStore.Schedule schedule) {
+        if (dailyCallStatus.isGloballySkipped(System.currentTimeMillis())) {
+            // The whole day is skipped; offer to resume instead of a per-reminder status.
+            showSkipDialog(optimisticConfig == null ? new RemoteStore(this).load() : optimisticConfig);
+            return;
+        }
         if (DailyCallStatus.NOT_TODAY.equals(dailyCallStatus.display(schedule, System.currentTimeMillis()).kind)) return;
         Dialog dialog = new Dialog(this);
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -1205,6 +1222,183 @@ public final class MainActivity extends FragmentActivity {
 
         dialog.setContentView(sheet);
         showSheet(dialog, 0f);
+    }
+
+    private void addSkipBanner(LinearLayout body, RemoteStore.Config config) {
+        long now = System.currentTimeMillis();
+        if (config == null || config.skip == null || config.skip.isOver(now)) return;
+        LinearLayout banner = new LinearLayout(this);
+        banner.setGravity(Gravity.CENTER_VERTICAL);
+        banner.setPadding(Ui.dp(this, 14), Ui.dp(this, 10), Ui.dp(this, 8), Ui.dp(this, 10));
+        banner.setBackground(Ui.rounded(Ui.PRIMARY, 16, this));
+        banner.setOnClickListener(v -> showSkipDialog(config));
+        banner.addView(Ui.text(this, skipSummary(config.skip, now), 13, Ui.INK, true),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        Button resume = button(AppLanguage.ui(this, "Resume reminders"), Ui.WHITE, Ui.ACCENT);
+        Ui.typography(resume, 12, true);
+        resume.setOnClickListener(v -> saveSkip(null));
+        banner.addView(resume, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, Ui.dp(this, 38)));
+        body.addView(banner, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 4, 0, 10));
+    }
+
+    private String skipSummary(SkipRange skip, long now) {
+        if (!skip.covers(now)) {
+            return String.format(AppLanguage.ui(this, "Reminders will be skipped %s – %s"),
+                    shortDate(skip.from), shortDate(skip.until));
+        }
+        if (skip.until.equals(SkipRange.dayKey(now))) {
+            return AppLanguage.ui(this, "All reminders skipped today");
+        }
+        return String.format(AppLanguage.ui(this, "All reminders skipped until %s"),
+                shortDate(skip.until));
+    }
+
+    private String shortDate(String isoDay) {
+        Calendar day = Calendar.getInstance();
+        day.clear();
+        day.set(Integer.parseInt(isoDay.substring(0, 4)),
+                Integer.parseInt(isoDay.substring(5, 7)) - 1,
+                Integer.parseInt(isoDay.substring(8, 10)));
+        return new java.text.SimpleDateFormat("d MMM", AppLanguage.locale(currentLanguage()))
+                .format(day.getTime());
+    }
+
+    private void showSkipDialog(RemoteStore.Config config) {
+        if (config == null) return;
+        Dialog dialog = new Dialog(this);
+        dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        dialog.setCanceledOnTouchOutside(true);
+
+        LinearLayout sheet = new LinearLayout(this);
+        sheet.setOrientation(LinearLayout.VERTICAL);
+        sheet.setPadding(Ui.dp(this, 18), Ui.dp(this, 8),
+                Ui.dp(this, 18), Ui.dp(this, 16));
+        sheet.setBackground(Ui.topRounded(Ui.WHITE, 28, this));
+        sheet.setClipChildren(false);
+        sheet.setClipToPadding(false);
+        Ui.safeArea(sheet, true, false, true, true);
+        sheet.addView(draggableSheetHandle(dialog, sheet), Ui.margins(
+                ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this, 24), this, 0, 0, 0, 2));
+
+        LinearLayout header = new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.addView(Ui.text(this, AppLanguage.ui(this, "Skip reminders"), 18, Ui.INK, true),
+                new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+        TextView close = Ui.text(this, "×", 26, Ui.MUTED, false);
+        close.setGravity(Gravity.CENTER);
+        close.setContentDescription("Close skip reminders");
+        close.setBackground(Ui.rounded(Ui.RAISED2, 21, this));
+        close.setOnClickListener(v -> dialog.dismiss());
+        header.addView(close, new LinearLayout.LayoutParams(Ui.dp(this, 42), Ui.dp(this, 42)));
+        sheet.addView(header);
+
+        long now = System.currentTimeMillis();
+        if (config.skip != null && !config.skip.isOver(now)) {
+            sheet.addView(Ui.text(this, skipSummary(config.skip, now), 13, Ui.MUTED, false),
+                    sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT, 0, 2, 0, 12));
+            Button resume = button(AppLanguage.ui(this, "Resume reminders"), Ui.ACCENT, Ui.WHITE);
+            resume.setOnClickListener(v -> {
+                dialog.dismiss();
+                saveSkip(null);
+            });
+            sheet.addView(resume, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                    Ui.dp(this, 48), 0, 0, 0, 8));
+        }
+
+        String today = SkipRange.dayKey(now);
+        Button skipToday = button(AppLanguage.ui(this, "Skip today"), Ui.PRIMARY, Ui.ACCENT);
+        skipToday.setOnClickListener(v -> {
+            dialog.dismiss();
+            saveSkip(SkipRange.of(today, today));
+        });
+        sheet.addView(skipToday, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                Ui.dp(this, 48), 0, 4, 0, 8));
+
+        Button chooseDays = button(AppLanguage.ui(this, "Choose days"), Ui.PRIMARY, Ui.ACCENT);
+        chooseDays.setOnClickListener(v -> {
+            dialog.dismiss();
+            pickSkipDays();
+        });
+        sheet.addView(chooseDays, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                Ui.dp(this, 48), 0, 0, 0, 0));
+
+        TextView note = Ui.text(this,
+                AppLanguage.ui(this, "Reminders come back on their own afterwards"),
+                12, Ui.MUTED, false);
+        note.setGravity(Gravity.CENTER);
+        sheet.addView(note, sizedMargins(ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 0, 10, 0, 0));
+
+        dialog.setContentView(sheet);
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+            window.setGravity(Gravity.BOTTOM);
+            window.setDimAmount(0.48f);
+            window.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
+            window.setNavigationBarColor(Ui.BG);
+            applyLightSystemBars(window);
+            window.setWindowAnimations(R.style.BottomSheetAnimation);
+        }
+        dialog.show();
+        if (window != null) window.setLayout(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+
+    /** Picks the first, then the last skipped day; at most {@link SkipRange#MAX_DAYS} days. */
+    private void pickSkipDays() {
+        long now = System.currentTimeMillis();
+        pickDay("Next", now, now, (from, fromTime) ->
+                pickDay("Skip these days", fromTime, fromTime, (until, untilTime) -> {
+                    SkipRange range = SkipRange.of(from, until);
+                    if (range != null) saveSkip(range);
+                }));
+    }
+
+    private interface DayChosen { void chosen(String isoDay, long time); }
+
+    private void pickDay(String confirm, long earliest, long initial, DayChosen chosen) {
+        Calendar start = Calendar.getInstance();
+        start.setTimeInMillis(initial);
+        DatePickerDialog picker = new DatePickerDialog(this, null, start.get(Calendar.YEAR), start.get(Calendar.MONTH), start.get(Calendar.DAY_OF_MONTH));
+        Calendar min = Calendar.getInstance();
+        min.setTimeInMillis(earliest);
+        min.set(Calendar.HOUR_OF_DAY, 0);
+        min.set(Calendar.MINUTE, 0);
+        min.set(Calendar.SECOND, 0);
+        min.set(Calendar.MILLISECOND, 0);
+        picker.getDatePicker().setMinDate(min.getTimeInMillis());
+        min.add(Calendar.DAY_OF_YEAR, SkipRange.MAX_DAYS - 1);
+        picker.getDatePicker().setMaxDate(min.getTimeInMillis());
+        // Samsung's calendar hides dialog titles, so the confirm button says which pick this is.
+        picker.setButton(DialogInterface.BUTTON_POSITIVE, AppLanguage.ui(this, confirm),
+                (dialog, which) -> {
+                    DatePicker date = picker.getDatePicker();
+                    Calendar picked = Calendar.getInstance();
+                    picked.clear();
+                    picked.set(date.getYear(), date.getMonth(), date.getDayOfMonth());
+                    chosen.chosen(SkipRange.dayKey(picked.getTimeInMillis()),
+                            picked.getTimeInMillis());
+                });
+        picker.show();
+    }
+
+    private void saveSkip(SkipRange skip) {
+        RemoteStore.Config config = new RemoteStore(this).load();
+        if (config != null) {
+            config.skip = skip;
+            optimisticConfig = config;
+        }
+        render();
+        sync.updateSkip(skip, (success, message) -> runOnUiThread(() -> {
+            status = message;
+            if (!success) optimisticConfig = null;
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+            render();
+        }));
     }
 
     private void saveOwnSchedules(RemoteStore.Config config) {

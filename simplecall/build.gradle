@@ -7,13 +7,6 @@ base {
     archivesName = 'Gurthu-Chey-2.0'
 }
 
-def generatedReminderRingtone = layout.buildDirectory.dir('generated/reminder-ringtone-res')
-
-tasks.register('prepareReminderRingtone', Copy) {
-    from(rootProject.file('parent/src/main/res/raw/incoming_ring.wav'))
-    into(generatedReminderRingtone.map { it.dir('raw') })
-}
-
 dependencies {
     implementation platform('com.google.firebase:firebase-bom:34.18.0')
     implementation 'com.google.firebase:firebase-auth'
@@ -34,7 +27,7 @@ android {
         applicationId = 'com.gurthuchey.app'
         minSdk = 26
         targetSdk = 35
-        versionCode = 88
+        versionCode = 89
         versionName = '2.0'
         testInstrumentationRunner = 'com.gurthuchey.remindercall.SampleLunchCallInstrumentation'
     }
@@ -54,8 +47,6 @@ android {
     }
 }
 
-android.sourceSets.main.res.srcDir(generatedReminderRingtone)
-tasks.named('preBuild').configure { dependsOn(tasks.named('prepareReminderRingtone')) }
 
 android.applicationVariants.configureEach { variant ->
     if (variant.buildType.name == 'release') {

@@ -12,6 +12,20 @@ import java.util.List;
 import java.util.Map;
 
 public final class ModelsRemoteTest {
+    @Test public void memberCarriesItsSkippedDays() {
+        Map<String, Object> member = new HashMap<>();
+        member.put("name", "Nana");
+        member.put("skipFrom", "2026-10-14");
+        member.put("skipUntil", "2026-10-18");
+
+        Models.Member parsed = Models.Member.fromRemote("nana", member);
+
+        assertEquals("2026-10-14", parsed.skip.from);
+        assertEquals("2026-10-18", parsed.skip.until);
+        member.put("skipUntil", "2026-10-01");
+        assertEquals(null, Models.Member.fromRemote("nana", member).skip);
+    }
+
     @Test public void onePersonKeepsEveryMedicineTime() {
         Map<String, Object> member = new HashMap<>();
         member.put("name", "Nana");

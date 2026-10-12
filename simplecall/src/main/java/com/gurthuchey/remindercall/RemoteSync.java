@@ -337,6 +337,27 @@ final class RemoteSync {
         }, () -> {});
     }
 
+    /** Skips every reminder on the given days; a null range resumes reminders. */
+    void updateSkip(SkipRange skip, Callback callback) {
+        RemoteStore.Pairing pairing = store.pairing();
+        if (pairing == null) {
+            callback.complete(false, "Phone is not connected");
+            return;
+        }
+        ensureUser(user -> {
+            Map<String, Object> update = new HashMap<>();
+            update.put("skipFrom", skip == null ? FieldValue.delete() : skip.from);
+            update.put("skipUntil", skip == null ? FieldValue.delete() : skip.until);
+            update.put("revision", FieldValue.increment(1L));
+            update.put("updatedAt", FieldValue.serverTimestamp());
+            member(pairing).update(update)
+                    .addOnSuccessListener(unused -> callback.complete(true,
+                            skip == null ? "Reminders resumed" : "Reminders skipped"))
+                    .addOnFailureListener(error -> callback.complete(false,
+                            "Could not update reminders. Check the internet and try again."));
+        }, () -> callback.complete(false, "Sign in again to skip reminders."));
+    }
+
     private static ApplyResult applyScheduleDocument(Context context, RemoteStore store,
             DocumentSnapshot snapshot) throws Exception {
         RemoteStore.Config updated = RemoteStore.Config.fromRemote(
